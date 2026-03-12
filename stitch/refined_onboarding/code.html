@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>IRL Alert Onboarding</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF", // iOS Standard Blue
+                        "background-light": "#F2F2F7",
+                        "background-dark": "#000000",
+                        "card-dark": "#1C1C1E",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "10px", 
+                        "lg": "12px", 
+                        "xl": "16px", 
+                        "2xl": "24px",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .ios-blur { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .safe-area-top { padding-top: env(safe-area-inset-top); }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased overflow-hidden selection:bg-primary/30">
+<div class="relative flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background-light dark:bg-background-dark">
+<!-- Top Status/Header Area -->
+<header class="safe-area-top flex items-center justify-between px-6 py-4">
+<div class="w-10"></div>
+<div class="flex items-center gap-2">
+<div class="bg-primary p-1.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-white text-xl block" style="font-variation-settings: 'FILL' 1">security</span>
+</div>
+<h2 class="text-slate-900 dark:text-white text-[17px] font-semibold tracking-tight">IRL Alert</h2>
+</div>
+<button class="w-10 text-primary text-[17px] font-medium active:opacity-50 transition-opacity">Skip</button>
+</header>
+<!-- Main Content (Scrollable but fits within viewport on most iOS devices) -->
+<main class="flex-1 px-6 flex flex-col items-center justify-center text-center overflow-y-auto">
+<!-- Hero Visual -->
+<div class="relative w-full aspect-square max-w-[260px] mb-10">
+<div class="absolute inset-0 bg-primary/10 rounded-full animate-pulse"></div>
+<div class="absolute inset-4 bg-primary/5 rounded-full"></div>
+<div class="absolute inset-8 rounded-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-white dark:border-white/10 ring-1 ring-black/5">
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBSdmkHsAxvKe07uMdt-npnffgecnQiNdUJ1Ru8icKdiztz_Ht-W_dYAzBPgQY26Wgmj6xUwLw_mL89OjndRoRYwFzTqB2mNBXyIX1gkzveqatUEO4-CXzZvgLRKEP-pswhCslI5wJV4onWgyNXYV7YYOpWH6-GE-VLMqJwUxNFAwF3urLt3JBAqZVUS9FhBHIDl0blcXczUve3gWVXbOdAPhfzp4NdFXanU6F_CyFOp5zC10o5AeFOScLOldOjfXcQxtLgrw7gMXpb')"></div>
+</div>
+<!-- Floating Alert Elements -->
+<div class="absolute -top-2 -right-4 bg-primary px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 border border-white/20">
+<span class="material-symbols-outlined text-white text-[14px] leading-none" style="font-variation-settings: 'FILL' 1">notifications_active</span>
+<span class="text-white text-[11px] font-bold uppercase tracking-wider">Live</span>
+</div>
+</div>
+<!-- Value Propositions -->
+<div class="space-y-3 px-2">
+<h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                    Stay safe in the <span class="text-primary">real world</span>
+</h1>
+<p class="text-slate-500 dark:text-slate-400 text-[17px] leading-snug">
+                    Real-time safety alerts and community verified reports for your peace of mind.
+                </p>
+</div>
+<!-- iOS Specific Permission Emphasis Section -->
+<div class="mt-8 w-full space-y-3">
+<div class="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 shadow-sm">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1">location_on</span>
+</div>
+<div class="text-left">
+<p class="text-[15px] font-semibold text-slate-900 dark:text-white">Enable "Always" Location</p>
+<p class="text-[13px] text-slate-500 dark:text-slate-400">Essential for background safety monitoring and proximity alerts.</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 shadow-sm">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1">notifications</span>
+</div>
+<div class="text-left">
+<p class="text-[15px] font-semibold text-slate-900 dark:text-white">Allow Critical Alerts</p>
+<p class="text-[13px] text-slate-500 dark:text-slate-400">Get notified immediately even if your device is silenced.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer / Actions -->
+<footer class="safe-area-bottom p-6 space-y-6">
+<div class="space-y-3">
+<button class="w-full bg-primary hover:bg-primary/90 text-white text-[17px] font-semibold py-4 rounded-xl transition-all shadow-md active:scale-[0.98]">
+                    Continue
+                </button>
+<p class="text-center text-[12px] text-slate-400 dark:text-slate-500 leading-tight px-4">
+                    By continuing, you agree to our <a class="underline" href="#">Terms of Service</a> &amp; <a class="underline" href="#">Privacy Policy</a>
+</p>
+</div>
+<!-- iOS-style Progress Indicators -->
+<div class="flex justify-center items-center gap-2 pb-2">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-800"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-800"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-800"></div>
+</div>
+</footer>
+</div>
+</body></html>

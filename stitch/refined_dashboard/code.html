@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>IRL Alert Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                        "surface-dark": "#1c2431",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .soft-shadow {
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+        .status-glow {
+            box-shadow: 0 0 40px rgba(43, 124, 238, 0.5);
+        }
+        .status-ring {
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            80%, 100% { transform: scale(1.2); opacity: 0; }
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<nav class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 ios-blur px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+<span class="material-symbols-outlined text-primary text-2xl">person</span>
+</div>
+<div>
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Welcome back,</p>
+<p class="text-sm font-bold dark:text-white">Alex Chen</p>
+</div>
+</div>
+<h2 class="absolute left-1/2 -translate-x-1/2 text-lg font-bold tracking-tight">IRL Alert</h2>
+<button class="relative size-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-surface-dark border border-slate-200 dark:border-slate-700">
+<span class="material-symbols-outlined text-slate-600 dark:text-slate-300">notifications</span>
+<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-background-light dark:border-background-dark"></span>
+</button>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 p-6 space-y-6 max-w-2xl mx-auto w-full">
+<!-- Hero Status Section -->
+<section class="flex flex-col items-center py-4">
+<div class="relative flex items-center justify-center">
+<!-- Pulsing background rings -->
+<div class="absolute size-64 bg-primary/10 rounded-full status-ring"></div>
+<div class="absolute size-64 bg-primary/5 rounded-full status-ring" style="animation-delay: 0.5s"></div>
+<div class="size-56 rounded-full border-[12px] border-slate-100 dark:border-surface-dark flex flex-col items-center justify-center bg-white dark:bg-background-dark soft-shadow relative z-10 transition-transform duration-500">
+<div class="size-48 rounded-full border-4 border-primary/30 flex flex-col items-center justify-center status-glow">
+<span class="material-symbols-outlined text-primary text-6xl font-light" style="font-variation-settings: 'FILL' 1">shield</span>
+<p class="text-primary font-bold text-2xl mt-1 tracking-tight">Active</p>
+</div>
+</div>
+</div>
+<div class="mt-8 text-center">
+<h1 class="text-2xl font-bold tracking-tight dark:text-white">System Secure</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Monitoring 8 nearby devices</p>
+</div>
+</section>
+<!-- Connection Health Section (New) -->
+<section class="space-y-3">
+<h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 px-1">Service Connectivity</h3>
+<div class="grid grid-cols-3 gap-3">
+<div class="bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+<div class="size-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-purple-500 text-lg">videocam</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Twitch</p>
+<div class="flex items-center gap-1">
+<div class="size-1.5 bg-green-500 rounded-full"></div>
+<span class="text-[10px] font-bold dark:text-white">Online</span>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+<div class="size-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-teal-500 text-lg">analytics</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Streamlabs</p>
+<div class="flex items-center gap-1">
+<div class="size-1.5 bg-green-500 rounded-full"></div>
+<span class="text-[10px] font-bold dark:text-white">Online</span>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+<div class="size-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-orange-500 text-lg">cloud_done</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Cloud</p>
+<div class="flex items-center gap-1">
+<div class="size-1.5 bg-green-500 rounded-full"></div>
+<span class="text-[10px] font-bold dark:text-white">Syncing</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Metrics Grid -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-white dark:bg-surface-dark p-5 rounded-xl border border-slate-100 dark:border-slate-800 soft-shadow">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-xl">speed</span>
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Latency</span>
+</div>
+<div class="flex items-baseline gap-2">
+<p class="text-3xl font-bold dark:text-white">24</p>
+<span class="text-sm font-medium text-slate-500">ms</span>
+</div>
+<div class="mt-2 flex items-center text-red-500 text-xs font-bold">
+<span class="material-symbols-outlined text-xs">trending_down</span>
+<span>2% slower</span>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark p-5 rounded-xl border border-slate-100 dark:border-slate-800 soft-shadow">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-green-500 text-xl">signal_cellular_alt</span>
+<span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Signal</span>
+</div>
+<div class="flex items-baseline gap-2">
+<p class="text-3xl font-bold dark:text-white">98</p>
+<span class="text-sm font-medium text-slate-500">%</span>
+</div>
+<div class="mt-2 flex items-center text-green-500 text-xs font-bold">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+<span>Stable</span>
+</div>
+</div>
+</div>
+<!-- Integrated Connection Card -->
+<section class="bg-white dark:bg-surface-dark rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 soft-shadow">
+<div class="h-40 bg-slate-200 dark:bg-slate-800 relative group overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBv4naOixyU5SI4u21N8yAp9FDA8gkm52LDX0tzlqmIz6fv0pqSMuPfHkKmkcCxA9wFM1VlyfKKIvCkLruBv4zVw1wZTkX8X_rgXunLQ6HnYqkjCzl2V4gJmRY6frSWZj7M5EpbzbMzlPOO91m9yRy3UO8PhGtIorZ-_YBjfVDbqQt44xQv4pEy9gYn8QqoIrRPJSqyK9qvvdtuu2olRC37dhoqTkN36UIa-1vjFhy2ScQ5WyQVd_bTkojWdO0KxcrMKSst-WN2YgSt');"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-4 left-4 flex items-center gap-2">
+<div class="size-2.5 bg-green-500 rounded-full animate-pulse"></div>
+<span class="text-white text-sm font-bold">Live Network Feed</span>
+</div>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="text-lg font-bold dark:text-white">Secure Connection</h3>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Encrypted tunnel established via Mesh-Net</p>
+</div>
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">WPA3</span>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800">
+<span class="text-slate-500 dark:text-slate-400">Alerts (1h)</span>
+<span class="font-bold dark:text-white">3 Detected</span>
+</div>
+<div class="flex justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800">
+<span class="text-slate-500 dark:text-slate-400">Session Uptime</span>
+<span class="font-bold dark:text-white">12d 4h 15m</span>
+</div>
+</div>
+<button class="w-full mt-6 bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-xl">analytics</span>
+                View Network Details
+            </button>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar (iOS style) -->
+<div class="sticky bottom-0 z-50 bg-background-light/90 dark:bg-background-dark/90 ios-blur border-t border-slate-200 dark:border-slate-800 pb-8 pt-2 px-6">
+<div class="flex items-center justify-between max-w-lg mx-auto">
+<a class="flex flex-col items-center gap-1 group" href="#">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1">home</span>
+<p class="text-[10px] font-bold text-primary uppercase tracking-widest">Home</p>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<p class="text-[10px] font-bold uppercase tracking-widest">Devices</p>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" href="#">
+<span class="material-symbols-outlined">warning</span>
+<p class="text-[10px] font-bold uppercase tracking-widest">Alerts</p>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-[10px] font-bold uppercase tracking-widest">Settings</p>
+</a>
+</div>
+</div>
+</body></html>

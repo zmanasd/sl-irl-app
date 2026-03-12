@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#0a0f18",
+                        "surface-dark": "#161e2b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>IRL Alert Log</title>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark overflow-hidden shadow-2xl">
+<!-- Header -->
+<header class="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/50 p-4">
+<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Live Stream</span>
+<h1 class="text-3xl font-black tracking-tight">Event Log</h1>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center justify-center size-10 rounded-full bg-slate-200/50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined text-xl">search</span>
+</button>
+<button class="relative flex items-center justify-center size-10 rounded-full bg-slate-200/50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined text-xl">notifications</span>
+<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-background-dark"></span>
+</button>
+</div>
+</div>
+<!-- Queue Status Indicator -->
+<div class="flex items-center justify-between bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 mb-4">
+<div class="flex items-center gap-3">
+<div class="relative flex">
+<span class="flex h-3 w-3 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</span>
+</div>
+<div>
+<p class="text-sm font-bold text-primary">8 Pending Alerts</p>
+<p class="text-[10px] text-slate-500 dark:text-slate-400">Processing queue in background</p>
+</div>
+</div>
+<button class="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg shadow-sm">View Queue</button>
+</div>
+<!-- Tabs -->
+<div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+<button class="px-5 py-2 rounded-full bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 whitespace-nowrap">All Events</button>
+<button class="px-5 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 text-sm font-bold whitespace-nowrap">Donations</button>
+<button class="px-5 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 text-sm font-bold whitespace-nowrap">Subs</button>
+<button class="px-5 py-2 rounded-full bg-slate-200/50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 text-sm font-bold whitespace-nowrap">Raids</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+<!-- Raid Alert Card (New Category from PRD) -->
+<div class="group relative overflow-hidden rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-sm transition-all active:scale-[0.98]">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-3">
+<div class="flex items-center gap-3">
+<div class="flex items-center justify-center size-10 rounded-xl bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400">
+<span class="material-symbols-outlined">groups</span>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 dark:text-slate-100">Massive Raid!</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400">Just now • Twitch</p>
+</div>
+</div>
+<span class="text-orange-500 font-black text-lg">1,240</span>
+</div>
+<p class="text-sm text-slate-600 dark:text-slate-300 mb-4">
+<span class="font-bold text-orange-500">Pokimane</span> is raiding with <span class="font-bold">1,240 viewers</span>!
+                </p>
+<div class="flex gap-2">
+<button class="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">campaign</span> Shoutout Raid
+                    </button>
+</div>
+</div>
+</div>
+<!-- Donation Alert Card -->
+<div class="group relative overflow-hidden rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-sm transition-all active:scale-[0.98]">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-3">
+<div class="flex items-center gap-3">
+<div class="flex items-center justify-center size-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 dark:text-slate-100">Big Donation</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400">2m ago • HyperChat</p>
+</div>
+</div>
+<span class="text-emerald-500 font-black text-lg">$250.00</span>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 italic text-sm text-slate-700 dark:text-slate-300 border-l-2 border-emerald-500/30">
+                    "Absolute legend! Keep the stream going, the 24h challenge is almost done!" — <span class="font-bold not-italic">AlexStreamer</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">favorite</span> Thank Alex
+                    </button>
+<button class="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined text-sm">share</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Subscriber Alert Card -->
+<div class="group relative overflow-hidden rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-sm active:scale-[0.98]">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
+<div class="p-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<div class="size-14 rounded-full border-2 border-primary p-0.5">
+<div class="w-full h-full rounded-full bg-center bg-cover" data-alt="User profile avatar circle" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAPSOxnDHsm0_ercrlyNDb3BIRYlbPBE8-3cgpg_56AAPf7eiI1qkhg2fVkECdjE7lgBjsFMuSq4mAmHu_8DBi9cOzLwK-Ic5E-xu8my2f-RG5TDrJ6WcFaMF68zsn26qnWo8cHGFLEfCuR8LAR2axYG8HbnNospiaa41Ik_EcWmQ0BdVHzUcoZiu2cVuJQeCTTWd4uM9wWZgK7FtC_tyunWSVD_lM63EuFtwjifXhpDoUM6rOQcEKhPF8NdbOGaF7sq2KJHnbwTRxs')"></div>
+</div>
+<div class="absolute -bottom-1 -right-1 size-6 bg-primary rounded-full flex items-center justify-center border-2 border-white dark:border-surface-dark">
+<span class="material-symbols-outlined text-white text-[14px]">star</span>
+</div>
+</div>
+<div class="flex-1">
+<h3 class="font-bold text-slate-900 dark:text-slate-100">New Subscriber</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">sarah_j • Tier 1</p>
+<p class="text-xs text-primary font-bold mt-1">First time sub!</p>
+</div>
+<div class="text-[10px] text-slate-400 font-medium">12m ago</div>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2.5 bg-primary/10 text-primary dark:bg-primary/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">hand_gesture</span> Wave Back
+                    </button>
+</div>
+</div>
+</div>
+<!-- Bits Alert Card -->
+<div class="group relative overflow-hidden rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-sm active:scale-[0.98]">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
+<div class="p-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-3">
+<div class="flex items-center justify-center size-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">
+<span class="material-symbols-outlined">diamond</span>
+</div>
+<div>
+<h3 class="font-bold text-slate-900 dark:text-slate-100">1,000 Bits</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400">MikeTheHype • 45m ago</p>
+</div>
+</div>
+<div class="size-10 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 rounded-full">
+<span class="material-symbols-outlined text-purple-500">trending_up</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Follower Card (Minimal) -->
+<div class="flex items-center gap-4 p-4 rounded-2xl bg-slate-100/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-800/50">
+<div class="size-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-500 dark:text-slate-400">person_add</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900 dark:text-slate-100"><span class="font-bold">GhostRider</span> followed you</p>
+<p class="text-[10px] text-slate-500">1h ago</p>
+</div>
+<button class="text-primary text-xs font-bold px-4 py-2 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 active:bg-slate-50">Follow Back</button>
+</div>
+</main>
+<!-- Bottom Navigation Bar (iOS 26 Style) -->
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/90 dark:bg-background-dark/90 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-800/50 px-6 py-2 pb-8 flex justify-between items-center z-50">
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold">Panel</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined fill-1">bolt</span>
+<span class="text-[10px] font-bold">Alerts</span>
+</a>
+<div class="relative -top-6">
+<button class="size-14 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center border-[4px] border-background-light dark:border-background-dark ring-4 ring-primary/5">
+<span class="material-symbols-outlined text-3xl">videocam</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[10px] font-bold">Stats</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold">Setup</span>
+</a>
+</nav>
+</div>
+</body></html>

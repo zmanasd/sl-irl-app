@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>IRL Alert - Test Control</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
+<!-- Header / Top Bar -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 ios-blur border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center justify-between px-4 h-16">
+<button class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-2xl">arrow_back_ios_new</span>
+</button>
+<h1 class="text-lg font-semibold tracking-tight">Test Control Center</h1>
+<button class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-2xl">settings_input_component</span>
+</button>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto pb-40">
+<!-- Readiness Section -->
+<section class="p-6">
+<div class="bg-slate-200/50 dark:bg-slate-800/40 rounded-xl p-5 border border-slate-200 dark:border-slate-700/50">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">sensors</span>
+<h2 class="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">System Readiness</h2>
+</div>
+<span class="px-2 py-1 rounded bg-green-500/20 text-green-500 text-xs font-bold uppercase">Online</span>
+</div>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium">Signal Integrity</span>
+<span class="text-sm font-bold text-primary">85%</span>
+</div>
+<div class="h-2 w-full bg-slate-300 dark:bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 85%;"></div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+<span class="material-symbols-outlined text-sm">info</span>
+<span>Satellite link established. Optimal for high-precision testing.</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Alert Selection Grid - MVP Types -->
+<section class="px-6 space-y-4">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Simulate Alert Types</h3>
+<div class="grid grid-cols-2 gap-4">
+<!-- Donation -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center mb-3 group-hover:bg-green-500/20 transition-colors">
+<span class="material-symbols-outlined text-green-500">payments</span>
+</div>
+<span class="font-semibold text-sm">Donation</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">Simulate $5.00 tip</span>
+</button>
+<!-- Follow -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-primary">person_add</span>
+</div>
+<span class="font-semibold text-sm">Follow</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">New follower alert</span>
+</button>
+<!-- Subscription -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 transition-colors">
+<span class="material-symbols-outlined text-purple-500">card_membership</span>
+</div>
+<span class="font-semibold text-sm">Subscription</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tier 1 Sub alert</span>
+</button>
+<!-- Bits -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center mb-3 group-hover:bg-yellow-500/20 transition-colors">
+<span class="material-symbols-outlined text-yellow-500">diamond</span>
+</div>
+<span class="font-semibold text-sm">Bits</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">100 Bits cheer</span>
+</button>
+<!-- Host -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center mb-3 group-hover:bg-orange-500/20 transition-colors">
+<span class="material-symbols-outlined text-orange-500">campaign</span>
+</div>
+<span class="font-semibold text-sm">Host</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">Inbound host alert</span>
+</button>
+<!-- Raid -->
+<button class="flex flex-col items-start p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary transition-all group active:scale-95">
+<div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mb-3 group-hover:bg-red-500/20 transition-colors">
+<span class="material-symbols-outlined text-red-500">groups</span>
+</div>
+<span class="font-semibold text-sm">Raid</span>
+<span class="text-xs text-slate-500 dark:text-slate-400 mt-1">Incoming raid (25+)</span>
+</button>
+</div>
+</section>
+<!-- Configuration Section -->
+<section class="p-6 space-y-6">
+<div class="space-y-4 bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-medium">Force Audio Override</span>
+<span class="text-xs text-slate-500">Bypass Do Not Disturb settings</span>
+</div>
+<button class="w-12 h-6 rounded-full bg-primary relative transition-all">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+</button>
+</div>
+<div class="h-px bg-slate-200 dark:bg-slate-700"></div>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-medium">Flash Integration</span>
+<span class="text-xs text-slate-500">Strobe light visual alert</span>
+</div>
+<button class="w-12 h-6 rounded-full bg-slate-300 dark:bg-slate-600 relative transition-all">
+<div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</button>
+</div>
+</div>
+<!-- Deployment Visualizer -->
+<div class="relative w-full h-48 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+<div class="absolute inset-0 opacity-40 mix-blend-overlay">
+<img class="w-full h-full object-cover" data-alt="Stylized dark minimalist map representation of a city center" data-location="San Francisco" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6-PcCA6E4Ekfb31ZVvT4v3GmcjxCxkPl-2aM8GkIyw3gFaBs9699k_LURIiSvNl3_tIMXliVoHLtgWguu-eI7WFlTmWHCXAlvLzpPcGF2EMIWmFVENaNYclpxL3zQPKsa_ILVBOF-8lDUw5MVqDE45bWWW3FoH4OQptkhseh6odwb3EMefxaoDmjo6gkuFRkawu-OUJtfp2hBLkAOvOmDnprvPNBqSMJ1YeIQUeTKhmq-46clc7xse5AIw0Deh3sdhWfYcTSw-X0o"/>
+</div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="relative">
+<div class="absolute -inset-4 bg-primary/20 rounded-full animate-ping"></div>
+<div class="relative w-8 h-8 bg-primary rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+<span class="material-symbols-outlined text-white text-sm">my_location</span>
+</div>
+</div>
+</div>
+<div class="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg">
+<span class="text-[10px] text-white/80 font-medium uppercase tracking-wider italic">Simulation Target: Localized (3km Radius)</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Navigation / Trigger Bar -->
+<div class="fixed bottom-0 left-0 right-0 p-4 bg-background-light/80 dark:bg-background-dark/80 ios-blur border-t border-slate-200 dark:border-slate-800">
+<div class="max-w-md mx-auto space-y-4">
+<button class="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg shadow-lg shadow-primary/20 active:scale-95 transition-transform flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">bolt</span>
+            Deploy Test Alert
+        </button>
+<nav class="flex justify-between px-2 pb-2">
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Dashboard</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">experiment</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Testing</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">History</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Profile</span>
+</a>
+</nav>
+</div>
+</div>
+</body></html>

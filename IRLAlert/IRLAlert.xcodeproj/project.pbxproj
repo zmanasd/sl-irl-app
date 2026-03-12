@@ -1,0 +1,375 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		13DE9D8507C56C9440AC98A0 /* EventLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */; };
+		3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF3209CE8BB113171AD1D46 /* AppSettings.swift */; };
+		3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768E008DED73B2CC788ABFB7 /* SettingsView.swift */; };
+		5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF28462DB803A303269851C /* AlertType.swift */; };
+		8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5F2A159090B4916BE174E6 /* DashboardView.swift */; };
+		9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4E0E477043162A72007673 /* NavigationRouter.swift */; };
+		ACE67EBEA735690A613A8B23 /* ConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */; };
+		B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFB8D2865A027165D9776AF /* OnboardingView.swift */; };
+		E55C940952B046D454567048 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E4772A6A5637D0677D6FDA /* TabBarView.swift */; };
+		F981B8BD62405D967DFA41EC /* IRLAlertApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */; };
+		FE048EA2E271B66B9764A59E /* AlertTestingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLogView.swift; sourceTree = "<group>"; };
+		1EFB8D2865A027165D9776AF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsView.swift; sourceTree = "<group>"; };
+		42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRLAlertApp.swift; sourceTree = "<group>"; };
+		4B4E0E477043162A72007673 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
+		51E4772A6A5637D0677D6FDA /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
+		5EF3209CE8BB113171AD1D46 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		768E008DED73B2CC788ABFB7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		BFF28462DB803A303269851C /* AlertType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertType.swift; sourceTree = "<group>"; };
+		DC5F2A159090B4916BE174E6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		EB6B830C3A28C3D111328BFC /* IRLAlert.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IRLAlert.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTestingView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		6493884663462D7BFFCAE90B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BFF28462DB803A303269851C /* AlertType.swift */,
+				5EF3209CE8BB113171AD1D46 /* AppSettings.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		79105C5662420FEEDDBA3610 = {
+			isa = PBXGroup;
+			children = (
+				810301CCE56A1F0AC1121EC7 /* IRLAlert */,
+				81D6B15E0C1A25F8702DF6C9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		810301CCE56A1F0AC1121EC7 /* IRLAlert */ = {
+			isa = PBXGroup;
+			children = (
+				42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */,
+				6493884663462D7BFFCAE90B /* Models */,
+				97B95F964B88B2F0A2C55EAD /* ViewModels */,
+				C4A0631345B3E3E57E9B1862 /* Views */,
+			);
+			path = IRLAlert;
+			sourceTree = "<group>";
+		};
+		81D6B15E0C1A25F8702DF6C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				EB6B830C3A28C3D111328BFC /* IRLAlert.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		97B95F964B88B2F0A2C55EAD /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				4B4E0E477043162A72007673 /* NavigationRouter.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		C4A0631345B3E3E57E9B1862 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */,
+				2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */,
+				DC5F2A159090B4916BE174E6 /* DashboardView.swift */,
+				03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */,
+				1EFB8D2865A027165D9776AF /* OnboardingView.swift */,
+				768E008DED73B2CC788ABFB7 /* SettingsView.swift */,
+				51E4772A6A5637D0677D6FDA /* TabBarView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9FED6A45DF8A0588AA9CC5DF /* IRLAlert */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E274FB520922D005C08FD2DD /* Build configuration list for PBXNativeTarget "IRLAlert" */;
+			buildPhases = (
+				89B5ABA3741A83465A2026F7 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IRLAlert;
+			packageProductDependencies = (
+			);
+			productName = IRLAlert;
+			productReference = EB6B830C3A28C3D111328BFC /* IRLAlert.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		706946F906BE6A6405C7934E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					9FED6A45DF8A0588AA9CC5DF = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 2241FFA810AF0372B9D7E628 /* Build configuration list for PBXProject "IRLAlert" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 79105C5662420FEEDDBA3610;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 81D6B15E0C1A25F8702DF6C9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9FED6A45DF8A0588AA9CC5DF /* IRLAlert */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		89B5ABA3741A83465A2026F7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FE048EA2E271B66B9764A59E /* AlertTestingView.swift in Sources */,
+				5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */,
+				3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */,
+				ACE67EBEA735690A613A8B23 /* ConnectionsView.swift in Sources */,
+				8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */,
+				13DE9D8507C56C9440AC98A0 /* EventLogView.swift in Sources */,
+				F981B8BD62405D967DFA41EC /* IRLAlertApp.swift in Sources */,
+				9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */,
+				B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */,
+				3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */,
+				E55C940952B046D454567048 /* TabBarView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0882B9536890E38E207FA4B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		600169AB37DA05F7D6BC7BBF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "IRL Alert";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E16E02E20A332A58270F6B6C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "IRL Alert";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F419A1FF122842EA4D922AE6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2241FFA810AF0372B9D7E628 /* Build configuration list for PBXProject "IRLAlert" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F419A1FF122842EA4D922AE6 /* Debug */,
+				0882B9536890E38E207FA4B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E274FB520922D005C08FD2DD /* Build configuration list for PBXNativeTarget "IRLAlert" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600169AB37DA05F7D6BC7BBF /* Debug */,
+				E16E02E20A332A58270F6B6C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 706946F906BE6A6405C7934E /* Project object */;
+}
