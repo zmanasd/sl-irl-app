@@ -12,6 +12,7 @@
 		3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768E008DED73B2CC788ABFB7 /* SettingsView.swift */; };
 		5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF28462DB803A303269851C /* AlertType.swift */; };
 		8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5F2A159090B4916BE174E6 /* DashboardView.swift */; };
+		9069B63F467F303549011B67 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4717E6088F2CC6FC86576E84 /* DesignSystem.swift */; };
 		9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4E0E477043162A72007673 /* NavigationRouter.swift */; };
 		ACE67EBEA735690A613A8B23 /* ConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */; };
 		B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFB8D2865A027165D9776AF /* OnboardingView.swift */; };
@@ -25,6 +26,7 @@
 		1EFB8D2865A027165D9776AF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsView.swift; sourceTree = "<group>"; };
 		42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRLAlertApp.swift; sourceTree = "<group>"; };
+		4717E6088F2CC6FC86576E84 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		4B4E0E477043162A72007673 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
 		51E4772A6A5637D0677D6FDA /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 		5EF3209CE8BB113171AD1D46 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 				F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */,
 				2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */,
 				DC5F2A159090B4916BE174E6 /* DashboardView.swift */,
+				4717E6088F2CC6FC86576E84 /* DesignSystem.swift */,
 				03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */,
 				1EFB8D2865A027165D9776AF /* OnboardingView.swift */,
 				768E008DED73B2CC788ABFB7 /* SettingsView.swift */,
@@ -157,6 +160,7 @@
 				3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */,
 				ACE67EBEA735690A613A8B23 /* ConnectionsView.swift in Sources */,
 				8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */,
+				9069B63F467F303549011B67 /* DesignSystem.swift in Sources */,
 				13DE9D8507C56C9440AC98A0 /* EventLogView.swift in Sources */,
 				F981B8BD62405D967DFA41EC /* IRLAlertApp.swift in Sources */,
 				9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */,
