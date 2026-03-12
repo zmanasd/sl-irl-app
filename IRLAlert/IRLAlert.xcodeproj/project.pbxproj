@@ -7,10 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03D12E2CC142EEB28BADC594 /* TTSManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94E878175E4AEFA24301CEF /* TTSManager.swift */; };
+		0B783B6BC217FF5E1A5FB2DB /* MediaCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F35FCA7F0E9CB9B44806302 /* MediaCacheManager.swift */; };
 		13DE9D8507C56C9440AC98A0 /* EventLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */; };
+		357447FF94FADD3C50D5446E /* AlertEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B997C8CF8D6F599DC1E4196B /* AlertEvent.swift */; };
+		395F48E51C7DECAB77D3EB99 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332564AC65F8C74A8969183F /* AudioPlaybackService.swift */; };
 		3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF3209CE8BB113171AD1D46 /* AppSettings.swift */; };
 		3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768E008DED73B2CC788ABFB7 /* SettingsView.swift */; };
+		44E9E8442F83CC1EEC574DC5 /* SilentAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */; };
 		5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF28462DB803A303269851C /* AlertType.swift */; };
+		89AB0EAAAD98BA104D1BE0E2 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FD3BA2A2B6A95A64CACF7AD /* AudioSessionManager.swift */; };
+		8E4DA8820D73B0F7461109A8 /* AlertQueueManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B695205EEB96224FC268A1 /* AlertQueueManager.swift */; };
 		8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5F2A159090B4916BE174E6 /* DashboardView.swift */; };
 		9069B63F467F303549011B67 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4717E6088F2CC6FC86576E84 /* DesignSystem.swift */; };
 		9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4E0E477043162A72007673 /* NavigationRouter.swift */; };
@@ -23,15 +30,22 @@
 
 /* Begin PBXFileReference section */
 		03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLogView.swift; sourceTree = "<group>"; };
+		0FD3BA2A2B6A95A64CACF7AD /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
+		19B695205EEB96224FC268A1 /* AlertQueueManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertQueueManager.swift; sourceTree = "<group>"; };
 		1EFB8D2865A027165D9776AF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		1F35FCA7F0E9CB9B44806302 /* MediaCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCacheManager.swift; sourceTree = "<group>"; };
 		2FD65ED1179D0FC229502F1A /* ConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsView.swift; sourceTree = "<group>"; };
+		332564AC65F8C74A8969183F /* AudioPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackService.swift; sourceTree = "<group>"; };
 		42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRLAlertApp.swift; sourceTree = "<group>"; };
 		4717E6088F2CC6FC86576E84 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		4B4E0E477043162A72007673 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
 		51E4772A6A5637D0677D6FDA /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 		5EF3209CE8BB113171AD1D46 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		768E008DED73B2CC788ABFB7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioPlayer.swift; sourceTree = "<group>"; };
+		B997C8CF8D6F599DC1E4196B /* AlertEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertEvent.swift; sourceTree = "<group>"; };
 		BFF28462DB803A303269851C /* AlertType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertType.swift; sourceTree = "<group>"; };
+		C94E878175E4AEFA24301CEF /* TTSManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManager.swift; sourceTree = "<group>"; };
 		DC5F2A159090B4916BE174E6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		EB6B830C3A28C3D111328BFC /* IRLAlert.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IRLAlert.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTestingView.swift; sourceTree = "<group>"; };
@@ -41,6 +55,7 @@
 		6493884663462D7BFFCAE90B /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B997C8CF8D6F599DC1E4196B /* AlertEvent.swift */,
 				BFF28462DB803A303269851C /* AlertType.swift */,
 				5EF3209CE8BB113171AD1D46 /* AppSettings.swift */,
 			);
@@ -60,6 +75,7 @@
 			children = (
 				42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */,
 				6493884663462D7BFFCAE90B /* Models */,
+				B0F44F5944D73FFF4A58DDDE /* Services */,
 				97B95F964B88B2F0A2C55EAD /* ViewModels */,
 				C4A0631345B3E3E57E9B1862 /* Views */,
 			);
@@ -80,6 +96,19 @@
 				4B4E0E477043162A72007673 /* NavigationRouter.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		B0F44F5944D73FFF4A58DDDE /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				19B695205EEB96224FC268A1 /* AlertQueueManager.swift */,
+				332564AC65F8C74A8969183F /* AudioPlaybackService.swift */,
+				0FD3BA2A2B6A95A64CACF7AD /* AudioSessionManager.swift */,
+				1F35FCA7F0E9CB9B44806302 /* MediaCacheManager.swift */,
+				8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */,
+				C94E878175E4AEFA24301CEF /* TTSManager.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		C4A0631345B3E3E57E9B1862 /* Views */ = {
@@ -155,17 +184,24 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				357447FF94FADD3C50D5446E /* AlertEvent.swift in Sources */,
+				8E4DA8820D73B0F7461109A8 /* AlertQueueManager.swift in Sources */,
 				FE048EA2E271B66B9764A59E /* AlertTestingView.swift in Sources */,
 				5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */,
 				3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */,
+				395F48E51C7DECAB77D3EB99 /* AudioPlaybackService.swift in Sources */,
+				89AB0EAAAD98BA104D1BE0E2 /* AudioSessionManager.swift in Sources */,
 				ACE67EBEA735690A613A8B23 /* ConnectionsView.swift in Sources */,
 				8FDC86A613E496BC6D7E87E1 /* DashboardView.swift in Sources */,
 				9069B63F467F303549011B67 /* DesignSystem.swift in Sources */,
 				13DE9D8507C56C9440AC98A0 /* EventLogView.swift in Sources */,
 				F981B8BD62405D967DFA41EC /* IRLAlertApp.swift in Sources */,
+				0B783B6BC217FF5E1A5FB2DB /* MediaCacheManager.swift in Sources */,
 				9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */,
 				B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */,
 				3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */,
+				44E9E8442F83CC1EEC574DC5 /* SilentAudioPlayer.swift in Sources */,
+				03D12E2CC142EEB28BADC594 /* TTSManager.swift in Sources */,
 				E55C940952B046D454567048 /* TabBarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -19,9 +19,14 @@ final class AppSettings: ObservableObject {
         static let interAlertDelay = "interAlertDelay"
         static let disconnectNotificationTimeout = "disconnectNotificationTimeout"
         static let enabledAlertTypes = "enabledAlertTypes"
+        static let ttsRate = "ttsRate"
     }
 
     private let defaults: UserDefaults
+
+    // MARK: - Singleton for service-layer access
+    
+    static let shared = AppSettings()
 
     // MARK: - Init
 
@@ -57,6 +62,11 @@ final class AppSettings: ObservableObject {
     /// Identifier of the selected system TTS voice (nil = system default)
     @Published var ttsVoiceIdentifier: String? = nil {
         didSet { defaults.set(ttsVoiceIdentifier, forKey: Keys.ttsVoiceIdentifier) }
+    }
+
+    /// TTS speech rate (0.0–1.0, default is system default rate)
+    @Published var ttsRate: Float = 0.5 {
+        didSet { defaults.set(ttsRate, forKey: Keys.ttsRate) }
     }
 
     // MARK: - Feedback
@@ -107,6 +117,7 @@ final class AppSettings: ObservableObject {
             Keys.queueOverflowThreshold: 20,
             Keys.interAlertDelay: 1.0,
             Keys.disconnectNotificationTimeout: 30.0,
+            Keys.ttsRate: Float(0.5),
         ])
     }
 
@@ -124,5 +135,6 @@ final class AppSettings: ObservableObject {
         if let rawValues = defaults.array(forKey: Keys.enabledAlertTypes) as? [String] {
             enabledAlertTypes = Set(rawValues.compactMap { AlertType(rawValue: $0) })
         }
+        ttsRate = defaults.float(forKey: Keys.ttsRate)
     }
 }
