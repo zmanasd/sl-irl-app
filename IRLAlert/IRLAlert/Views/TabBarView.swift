@@ -89,16 +89,6 @@ struct CustomNavBar: View {
             ) { router.switchToTab(.settings) }
             
             Spacer()
-            
-            // Placeholder 5th item to keep balance (could be Profile or Connections later)
-            VStack(spacing: 4) {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 22))
-                Text("Profile")
-                    .font(.system(size: 10, weight: .bold))
-            }
-            .foregroundStyle(Color.secondary.opacity(0.5))
-            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 8)
         .padding(.top, 12)

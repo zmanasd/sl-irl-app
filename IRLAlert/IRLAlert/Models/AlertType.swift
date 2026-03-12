@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// All supported alert types from the PRD (Section 4.1).
 /// Used for filtering, display, and queue processing.
@@ -36,15 +37,15 @@ enum AlertType: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Accent color name (matches design system)
-    var accentColorName: String {
+    /// Accent color mapped to DesignSystem tokens
+    var accentColor: Color {
         switch self {
-        case .donation:     return "alertGreen"
-        case .follow:       return "primaryBlue"
-        case .subscription: return "alertPurple"
-        case .bits:         return "alertYellow"
-        case .host:         return "alertOrange"
-        case .raid:         return "alertRed"
+        case .donation:     return DesignSystem.Colors.alertGreen
+        case .follow:       return DesignSystem.Colors.primaryBlue
+        case .subscription: return DesignSystem.Colors.alertPurple
+        case .bits:         return DesignSystem.Colors.alertYellow
+        case .host:         return DesignSystem.Colors.alertOrange
+        case .raid:         return DesignSystem.Colors.alertRed
         }
     }
 }

@@ -9,11 +9,6 @@ enum DesignSystem {
         /// Primary accent color (iOS Standard Blue)
         static let primary = Color(hex: "007AFF")
         
-        /// Page background color (adapts to light/dark mode)
-        static let background = Color("Background") // We'll implement via extension fallback
-        
-        /// Elevated card background (adapts to light/dark mode)
-        static let card = Color("Card")
         
         // Alert Type Colors (from Tailwind mappings in event log)
         static let alertGreen = Color(hex: "10B981") // Emerald-500
