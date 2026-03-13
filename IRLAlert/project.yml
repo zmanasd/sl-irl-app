@@ -17,6 +17,11 @@ settings:
     ENABLE_PREVIEWS: YES
     SWIFT_STRICT_CONCURRENCY: complete
 
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: "16.1.1"
+
 targets:
   IRLAlert:
     type: application
@@ -29,6 +34,9 @@ targets:
           - "**/Info.plist"
     resources:
       - path: IRLAlert/Resources
+    dependencies:
+      - package: SocketIO
+        product: SocketIO
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.irlalert.app
@@ -41,3 +49,4 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIBackgroundModes: audio
+
