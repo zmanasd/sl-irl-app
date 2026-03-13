@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// Placeholder for the alert testing / simulation screen.
-/// Will be wired to the AlertQueueManager
+/// Alert testing screen — fire mock alerts through the queue engine.
 struct AlertTestingView: View {
     @State private var selectedAlertType: AlertType = .donation
     @ObservedObject var queueManager = AlertQueueManager.shared
-    @ObservedObject var settings = AppSettings.shared
+    @EnvironmentObject var settings: AppSettings
     
     // For haptic feedback
     private let impactMed = UIImpactFeedbackGenerator(style: .medium)
@@ -265,4 +264,5 @@ struct AlertTestingView: View {
 
 #Preview {
     AlertTestingView()
+        .environmentObject(AppSettings())
 }

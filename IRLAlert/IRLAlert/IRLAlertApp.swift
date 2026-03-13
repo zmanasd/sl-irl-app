@@ -36,5 +36,16 @@ struct RootView: View {
                 router.currentFlow = .main
             }
         }
+        .onChange(of: router.currentFlow) { _, newFlow in
+            if newFlow == .main {
+                startAudioEngine()
+            }
+        }
+    }
+    
+    /// Configure and start the background audio engine when entering the main flow.
+    private func startAudioEngine() {
+        AudioSessionManager.shared.configureSession()
+        SilentAudioPlayer.shared.start()
     }
 }

@@ -162,7 +162,7 @@ struct OnboardingPageView: View {
                 }
             }
             .padding(.bottom, 40)
-            .onAppear {
+            .task {
                 withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                     isAnimating = true
                 }

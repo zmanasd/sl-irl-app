@@ -46,16 +46,12 @@ struct CustomNavBar: View {
                 isSelected: router.selectedTab == .dashboard
             ) { router.switchToTab(.dashboard) }
             
-            Spacer()
-            
             NavBarItem(
                 tab: .alerts,
                 icon: "bolt.fill",
                 title: "Alerts",
                 isSelected: router.selectedTab == .alerts
             ) { router.switchToTab(.alerts) }
-            
-            Spacer()
             
             // Center Floating Action Button (Testing)
             Button {
@@ -78,17 +74,17 @@ struct CustomNavBar: View {
             }
             .offset(y: -20) // Pop out of the top of the bar
             
-            Spacer()
-            
             // Right tabs
-            NavBarItem( // We'll just map Connections to Settings for now in the 4-tab layout
+            NavBarItem(
                 tab: .settings,
                 icon: "gearshape.fill",
                 title: "Setup",
                 isSelected: router.selectedTab == .settings
             ) { router.switchToTab(.settings) }
             
-            Spacer()
+            // Placeholder for future Connections/Profile tab
+            Color.clear
+                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 8)
         .padding(.top, 12)

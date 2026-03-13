@@ -5,8 +5,9 @@ import SwiftUI
 struct QueueStatusView: View {
     @ObservedObject var queueManager = AlertQueueManager.shared
     
-    // Animation state for the pulsing dot
-    @State private var isPulsing = false
+    // Animation state for the pulsing ring
+    @State private var pulseScale: CGFloat = 0.8
+    @State private var pulseOpacity: Double = 1.0
     
     var body: some View {
         HStack(spacing: 8) {
@@ -20,12 +21,8 @@ struct QueueStatusView: View {
                     Circle()
                         .stroke(DesignSystem.Colors.alertGreen, lineWidth: 2)
                         .frame(width: 16, height: 16)
-                        .scaleEffect(isPulsing ? 1.5 : 0.8)
-                        .opacity(isPulsing ? 0 : 1)
-                        .animation(
-                            .easeOut(duration: 1.5).repeatForever(autoreverses: false),
-                            value: isPulsing
-                        )
+                        .scaleEffect(pulseScale)
+                        .opacity(pulseOpacity)
                 }
             }
             .frame(width: 16, height: 16)
@@ -35,7 +32,7 @@ struct QueueStatusView: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Color.secondary)
                 .textCase(.uppercase)
-                .contentTransition(.numericText()) // iOS 16+ smooth number changes
+                .contentTransition(.numericText())
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -46,16 +43,23 @@ struct QueueStatusView: View {
                     Capsule().stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                 )
         }
-        .onChange(of: queueManager.isProcessing) { _, isProcessing in
-            if isProcessing {
-                isPulsing = true
-            } else {
-                isPulsing = false
+        .task(id: queueManager.isProcessing) {
+            guard queueManager.isProcessing else {
+                // Reset to idle state cleanly
+                pulseScale = 0.8
+                pulseOpacity = 1.0
+                return
             }
-        }
-        .onAppear {
-            if queueManager.isProcessing {
-                isPulsing = true
+            // Run pulse loop while processing
+            while !Task.isCancelled {
+                withAnimation(.easeOut(duration: 1.2)) {
+                    pulseScale = 1.5
+                    pulseOpacity = 0
+                }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard !Task.isCancelled else { break }
+                pulseScale = 0.8
+                pulseOpacity = 1.0
             }
         }
     }
