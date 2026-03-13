@@ -4,12 +4,12 @@
 The Enhanced IRL Alert App is a background-capable alert relay application designed specifically for In-Real-Life (IRL) streamers. Its primary purpose is to ensure that streamers reliably hear and see their stream alerts (donations, follows, subscriptions, hosts, raids, etc.) while streaming from their mobile devices, without interrupting their primary streaming software.
 
 ## 2. Problem Statement
-The current prototype (`sl-irl-bridge`) relies on a browser-based WebSocket connection to receive alerts. On mobile platforms, specifically Apple (iOS) devices, web browsers are placed into a stasis/suspended state when minimized to conserve battery. This inherently breaks WebSocket connections and pauses audio playback, causing IRL streamers to miss essential alerts when their primary streaming application (e.g., IRL Pro, Twitch App) is active on screen.
+The current prototype (`sl-irl-bridge`) relies on a browser-based WebSocket connection to receive alerts. On mobile platforms, specifically Apple (iOS) devices, web browsers are placed into a stasis/suspended state when minimized to conserve battery. This inherently breaks WebSocket connections and pauses audio playback, causing IRL streamers to miss essential alerts when their primary streaming application (e.g., Moblin, Twitch App) is active on screen.
 
 ## 3. Target Audience & Use Case
 **Target Audience:** IRL Streamers that stream from mobile devices (specifically iPhones) and require a reliable alert relay that runs silently in the background.
 
-**Primary Use Case:** A streamer goes live using a mobile streaming app. They run this Enhanced Alert App in the background. As viewers interact with the stream (subscribing, donating, etc.), the streamer hears the alert audio and text-to-speech (TTS) natively mixed with their device audio, ensuring they never miss an interaction even when reading chat from their primary app.
+**Primary Use Case:** A streamer goes live using a mobile streaming app. They run this Enhanced Alert App in the background. As viewers interact with the stream (subscribing, donating, etc.), the streamer hears the alert audio and text-to-speech (TTS) natively mixed with their device audio, ensuring they never miss an interaction even when reading chat from their primary app (like Moblin).
 
 ## 4. Core Objectives & Requirements
 
