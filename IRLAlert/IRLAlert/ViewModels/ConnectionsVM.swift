@@ -73,6 +73,12 @@ final class ConnectionsVM: ObservableObject {
         lastError = nil
     }
     
+    /// Clear the current error message
+    func clearError() {
+        lastError = nil
+        connectionManager.clearLastError()
+    }
+    
     /// Disconnect all services.
     func disconnectAll() {
         connectionManager.disconnectAll()
