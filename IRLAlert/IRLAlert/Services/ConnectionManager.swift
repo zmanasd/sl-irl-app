@@ -99,6 +99,15 @@ final class ConnectionManager: ObservableObject {
             service.autoReconnectEnabled = true
             try await service.connect(with: credentials)
             saveCredentials(credentials, for: serviceId)
+            if AppSettings.shared.pushNotificationsEnabled,
+               let deviceToken = PushNotificationManager.shared.deviceToken {
+                Task {
+                    await RelayClient.shared.registerIfPossible(
+                        deviceToken: deviceToken,
+                        services: registeredServiceIdentifiers()
+                    )
+                }
+            }
             lastError = nil
             logger.info("Successfully initiated connection to \(serviceId.rawValue)")
         } catch {
@@ -138,6 +147,51 @@ final class ConnectionManager: ObservableObject {
     func state(for serviceId: ServiceIdentifier) -> ConnectionState {
         serviceStates[serviceId] ?? .disconnected
     }
+
+    /// All known service identifiers registered with the manager.
+    func registeredServiceIdentifiers() -> [ServiceIdentifier] {
+        Array(services.keys)
+    }
+
+    /// Serialized credentials for relay registration.
+    func relayCredentialPayloads() -> [[String: String]] {
+        var payloads: [[String: String]] = []
+
+        for serviceId in services.keys {
+            guard let credentials = loadCredentials(for: serviceId) else { continue }
+
+            switch credentials {
+            case .socketToken(let token):
+                payloads.append([
+                    "service": serviceId.rawValue,
+                    "type": "socket",
+                    "value": token
+                ])
+            case .oauthToken(let token):
+                payloads.append([
+                    "service": serviceId.rawValue,
+                    "type": "oauth",
+                    "value": token
+                ])
+            case .browserSourceURL(let url):
+                if serviceId == .streamlabs, let token = try? StreamlabsSocketService.extractToken(from: url) {
+                    payloads.append([
+                        "service": serviceId.rawValue,
+                        "type": "socket",
+                        "value": token
+                    ])
+                } else {
+                    payloads.append([
+                        "service": serviceId.rawValue,
+                        "type": "url",
+                        "value": url.absoluteString
+                    ])
+                }
+            }
+        }
+
+        return payloads
+    }
     
     /// Clear the last error message.
     func clearLastError() {
@@ -155,6 +209,7 @@ final class ConnectionManager: ObservableObject {
         let connected = serviceStates.values.filter { $0 == .connected }
         activeServiceCount = connected.count
         hasActiveConnection = !connected.isEmpty
+        PiPManager.shared.updateStatus(isConnected: hasActiveConnection)
     }
     
     // MARK: - Credential Persistence (Keychain-ready, UserDefaults for now)

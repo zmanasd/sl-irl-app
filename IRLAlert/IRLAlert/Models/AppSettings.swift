@@ -22,6 +22,7 @@ final class AppSettings: ObservableObject {
         static let ttsRate = "ttsRate"
         static let pipEnabled = "pipEnabled"
         static let pushNotificationsEnabled = "pushNotificationsEnabled"
+        static let relayUserId = "relayUserId"
     }
 
     private let defaults: UserDefaults
@@ -107,6 +108,9 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(pushNotificationsEnabled, forKey: Keys.pushNotificationsEnabled) }
     }
 
+    /// Stable identifier for relay registration
+    @Published private(set) var relayUserId: String = UUID().uuidString
+
     // MARK: - Alert Type Filters
 
     /// Which alert types are enabled for audio playback
@@ -132,6 +136,7 @@ final class AppSettings: ObservableObject {
             Keys.ttsRate: Float(0.5),
             Keys.pipEnabled: false,
             Keys.pushNotificationsEnabled: false,
+            Keys.relayUserId: UUID().uuidString,
         ])
     }
 
@@ -147,6 +152,8 @@ final class AppSettings: ObservableObject {
         disconnectNotificationTimeout = defaults.double(forKey: Keys.disconnectNotificationTimeout)
         pipEnabled = defaults.bool(forKey: Keys.pipEnabled)
         pushNotificationsEnabled = defaults.bool(forKey: Keys.pushNotificationsEnabled)
+        relayUserId = defaults.string(forKey: Keys.relayUserId) ?? UUID().uuidString
+        defaults.set(relayUserId, forKey: Keys.relayUserId)
 
         if let rawValues = defaults.array(forKey: Keys.enabledAlertTypes) as? [String] {
             enabledAlertTypes = Set(rawValues.compactMap { AlertType(rawValue: $0) })

@@ -26,6 +26,10 @@ final class PushNotificationManager: NSObject, ObservableObject {
     func handleUserToggle(enabled: Bool) async {
         if enabled {
             await requestAuthorizationAndRegister()
+            if let token = deviceToken {
+                let services = ConnectionManager.shared.registeredServiceIdentifiers()
+                await RelayClient.shared.registerIfPossible(deviceToken: token, services: services)
+            }
         } else {
             UIApplication.shared.unregisterForRemoteNotifications()
             await refreshAuthorizationStatus()
@@ -61,6 +65,11 @@ final class PushNotificationManager: NSObject, ObservableObject {
         let token = tokenData.map { String(format: "%02x", $0) }.joined()
         deviceToken = token
         logger.info("APNs device token: \(token, privacy: .private)")
+
+        Task {
+            let services = ConnectionManager.shared.registeredServiceIdentifiers()
+            await RelayClient.shared.registerIfPossible(deviceToken: token, services: services)
+        }
     }
 
     func handleFailedToRegister(_ error: Error) {

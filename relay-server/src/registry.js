@@ -3,11 +3,12 @@ export class RelayRegistry {
     this.records = new Map();
   }
 
-  register({ userId, deviceToken, services }) {
+  register({ userId, deviceToken, services, credentials }) {
     this.records.set(userId, {
       userId,
       deviceToken,
       services,
+      credentials: Array.isArray(credentials) ? credentials : [],
       directConnectionActive: false,
       updatedAt: new Date()
     });
@@ -17,6 +18,13 @@ export class RelayRegistry {
     const record = this.records.get(userId);
     if (!record) return;
     record.directConnectionActive = directConnectionActive;
+    record.updatedAt = new Date();
+  }
+
+  updateDeviceToken({ userId, deviceToken }) {
+    const record = this.records.get(userId);
+    if (!record || !deviceToken) return;
+    record.deviceToken = deviceToken;
     record.updatedAt = new Date();
   }
 

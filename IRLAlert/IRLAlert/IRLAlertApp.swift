@@ -37,6 +37,7 @@ struct RootView: View {
             if appSettings.hasCompletedOnboarding {
                 router.currentFlow = .main
             }
+            Task { await PushNotificationManager.shared.handleUserToggle(enabled: appSettings.pushNotificationsEnabled) }
         }
         .onChange(of: router.currentFlow) { _, newFlow in
             if newFlow == .main {
@@ -55,12 +56,17 @@ struct RootView: View {
     }
 
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        guard appSettings.pipEnabled else { return }
         switch newPhase {
         case .background:
-            PiPManager.shared.startIfPossible()
+            if appSettings.pipEnabled {
+                PiPManager.shared.startIfPossible()
+                Task { await RelayClient.shared.updatePresence(directConnectionActive: true) }
+            } else {
+                Task { await RelayClient.shared.updatePresence(directConnectionActive: false) }
+            }
         case .active:
             PiPManager.shared.stopIfActive()
+            Task { await RelayClient.shared.updatePresence(directConnectionActive: true) }
         default:
             break
         }
