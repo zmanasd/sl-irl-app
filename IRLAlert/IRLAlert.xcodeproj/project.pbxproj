@@ -15,6 +15,10 @@
 		357447FF94FADD3C50D5446E /* AlertEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B997C8CF8D6F599DC1E4196B /* AlertEvent.swift */; };
 		395F48E51C7DECAB77D3EB99 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332564AC65F8C74A8969183F /* AudioPlaybackService.swift */; };
 		3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF3209CE8BB113171AD1D46 /* AppSettings.swift */; };
+		A1C0C3E1B2D3F4A5B6C7D8E9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2C0C3E1B2D3F4A5B6C7D8E9 /* AppDelegate.swift */; };
+		A1C0C3E1B2D3F4A5B6C7D8EA /* PiPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2C0C3E1B2D3F4A5B6C7D8EA /* PiPManager.swift */; };
+		A1C0C3E1B2D3F4A5B6C7D8EB /* PushNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2C0C3E1B2D3F4A5B6C7D8EB /* PushNotificationManager.swift */; };
+		A1C0C3E1B2D3F4A5B6C7D8EC /* PiPStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2C0C3E1B2D3F4A5B6C7D8EC /* PiPStatusView.swift */; };
 		3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768E008DED73B2CC788ABFB7 /* SettingsView.swift */; };
 		44E9E8442F83CC1EEC574DC5 /* SilentAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */; };
 		4A60C46057C26D008C8AA188 /* DashboardVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE3D760213D2C420FF8AB72 /* DashboardVM.swift */; };
@@ -61,6 +65,10 @@
 		7791D908D6EA98F8FFFA0A8A /* StreamlabsSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamlabsSocketService.swift; sourceTree = "<group>"; };
 		8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentAudioPlayer.swift; sourceTree = "<group>"; };
 		9AC2AFA7E74451D3936A6E5A /* SettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsVM.swift; sourceTree = "<group>"; };
+		A2C0C3E1B2D3F4A5B6C7D8E9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A2C0C3E1B2D3F4A5B6C7D8EA /* PiPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiPManager.swift; sourceTree = "<group>"; };
+		A2C0C3E1B2D3F4A5B6C7D8EB /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
+		A2C0C3E1B2D3F4A5B6C7D8EC /* PiPStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiPStatusView.swift; sourceTree = "<group>"; };
 		B997C8CF8D6F599DC1E4196B /* AlertEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertEvent.swift; sourceTree = "<group>"; };
 		BAE3D760213D2C420FF8AB72 /* DashboardVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVM.swift; sourceTree = "<group>"; };
 		BFF28462DB803A303269851C /* AlertType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertType.swift; sourceTree = "<group>"; };
@@ -108,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */,
+				A2C0C3E1B2D3F4A5B6C7D8E9 /* AppDelegate.swift */,
 				6493884663462D7BFFCAE90B /* Models */,
 				B0F44F5944D73FFF4A58DDDE /* Services */,
 				97B95F964B88B2F0A2C55EAD /* ViewModels */,
@@ -148,6 +157,8 @@
 				E22234A40B6067C00E869A1D /* DisconnectMonitor.swift */,
 				32429B72293524B64F56CCD7 /* EventStore.swift */,
 				1F35FCA7F0E9CB9B44806302 /* MediaCacheManager.swift */,
+				A2C0C3E1B2D3F4A5B6C7D8EA /* PiPManager.swift */,
+				A2C0C3E1B2D3F4A5B6C7D8EB /* PushNotificationManager.swift */,
 				8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */,
 				7791D908D6EA98F8FFFA0A8A /* StreamlabsSocketService.swift */,
 				C94E878175E4AEFA24301CEF /* TTSManager.swift */,
@@ -164,6 +175,7 @@
 				4717E6088F2CC6FC86576E84 /* DesignSystem.swift */,
 				03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */,
 				1EFB8D2865A027165D9776AF /* OnboardingView.swift */,
+				A2C0C3E1B2D3F4A5B6C7D8EC /* PiPStatusView.swift */,
 				25817FB1EB3F707F5AC4AE7A /* QueueStatusView.swift */,
 				768E008DED73B2CC788ABFB7 /* SettingsView.swift */,
 				51E4772A6A5637D0677D6FDA /* TabBarView.swift */,
@@ -241,6 +253,7 @@
 				FE048EA2E271B66B9764A59E /* AlertTestingView.swift in Sources */,
 				5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */,
 				3B28E4E7D2D367503C3EAF38 /* AppSettings.swift in Sources */,
+				A1C0C3E1B2D3F4A5B6C7D8E9 /* AppDelegate.swift in Sources */,
 				395F48E51C7DECAB77D3EB99 /* AudioPlaybackService.swift in Sources */,
 				89AB0EAAAD98BA104D1BE0E2 /* AudioSessionManager.swift in Sources */,
 				912C0BF48F1E4280969A40DE /* ConnectionManager.swift in Sources */,
@@ -257,6 +270,9 @@
 				0B783B6BC217FF5E1A5FB2DB /* MediaCacheManager.swift in Sources */,
 				9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */,
 				B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */,
+				A1C0C3E1B2D3F4A5B6C7D8EA /* PiPManager.swift in Sources */,
+				A1C0C3E1B2D3F4A5B6C7D8EC /* PiPStatusView.swift in Sources */,
+				A1C0C3E1B2D3F4A5B6C7D8EB /* PushNotificationManager.swift in Sources */,
 				B6466B59332EE3D5AB2BD970 /* QueueStatusView.swift in Sources */,
 				1257048CA5A19F6F63CA6B96 /* SettingsVM.swift in Sources */,
 				3F794067F795E07B4A7D5D5A /* SettingsView.swift in Sources */,

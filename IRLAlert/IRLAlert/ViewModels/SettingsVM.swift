@@ -18,6 +18,8 @@ final class SettingsVM: ObservableObject {
     @Published var queueOverflowThreshold: Int
     @Published var interAlertDelay: Double
     @Published var disconnectNotificationTimeout: Double
+    @Published var pipEnabled: Bool
+    @Published var pushNotificationsEnabled: Bool
     @Published var enabledAlertTypes: Set<AlertType>
     
     /// Available TTS voices for the picker
@@ -39,6 +41,8 @@ final class SettingsVM: ObservableObject {
         queueOverflowThreshold = settings.queueOverflowThreshold
         interAlertDelay = settings.interAlertDelay
         disconnectNotificationTimeout = settings.disconnectNotificationTimeout
+        pipEnabled = settings.pipEnabled
+        pushNotificationsEnabled = settings.pushNotificationsEnabled
         enabledAlertTypes = settings.enabledAlertTypes
         
         loadAvailableVoices()
@@ -67,6 +71,8 @@ final class SettingsVM: ObservableObject {
         queueOverflowThreshold = 20
         interAlertDelay = 1.0
         disconnectNotificationTimeout = 30.0
+        pipEnabled = false
+        pushNotificationsEnabled = false
         enabledAlertTypes = Set(AlertType.allCases)
     }
     
@@ -91,6 +97,14 @@ final class SettingsVM: ObservableObject {
         $queueOverflowThreshold.dropFirst().sink { [weak self] val in self?.settings.queueOverflowThreshold = val }.store(in: &cancellables)
         $interAlertDelay.dropFirst().sink { [weak self] val in self?.settings.interAlertDelay = val }.store(in: &cancellables)
         $disconnectNotificationTimeout.dropFirst().sink { [weak self] val in self?.settings.disconnectNotificationTimeout = val }.store(in: &cancellables)
+        $pipEnabled.dropFirst().sink { [weak self] val in self?.settings.pipEnabled = val }.store(in: &cancellables)
+        $pushNotificationsEnabled
+            .dropFirst()
+            .sink { [weak self] val in
+                self?.settings.pushNotificationsEnabled = val
+                Task { await PushNotificationManager.shared.handleUserToggle(enabled: val) }
+            }
+            .store(in: &cancellables)
         $enabledAlertTypes.dropFirst().sink { [weak self] val in self?.settings.enabledAlertTypes = val }.store(in: &cancellables)
     }
 }

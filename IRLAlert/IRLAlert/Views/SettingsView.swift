@@ -153,6 +153,25 @@ struct SettingsView: View {
                             format: { "\(Int($0))s" }
                         )
                     }
+
+                    // Background & Notifications
+                    SettingsSection(title: "Background & Notifications") {
+                        SettingsToggleRow(
+                            icon: "pip",
+                            iconColor: .purple,
+                            title: "Enable PiP on Background",
+                            isOn: $viewModel.pipEnabled
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsToggleRow(
+                            icon: "bell.badge.fill",
+                            iconColor: .orange,
+                            title: "Enable Push Alerts",
+                            isOn: $viewModel.pushNotificationsEnabled
+                        )
+                    }
                     
                     // Alert Types (Filters)
                     SettingsSection(title: "Enabled Alerts") {

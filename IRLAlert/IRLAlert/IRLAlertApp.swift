@@ -6,6 +6,7 @@ import SwiftUI
 struct IRLAlertApp: App {
     @StateObject private var router = NavigationRouter()
     @StateObject private var appSettings = AppSettings()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -20,6 +21,7 @@ struct IRLAlertApp: App {
 struct RootView: View {
     @EnvironmentObject var router: NavigationRouter
     @EnvironmentObject var appSettings: AppSettings
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -41,11 +43,26 @@ struct RootView: View {
                 startAudioEngine()
             }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            handleScenePhaseChange(newPhase)
+        }
     }
     
     /// Configure and start the background audio engine when entering the main flow.
     private func startAudioEngine() {
         AudioSessionManager.shared.configureSession()
-        SilentAudioPlayer.shared.start()
+        PiPManager.shared.prepareIfNeeded()
+    }
+
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        guard appSettings.pipEnabled else { return }
+        switch newPhase {
+        case .background:
+            PiPManager.shared.startIfPossible()
+        case .active:
+            PiPManager.shared.stopIfActive()
+        default:
+            break
+        }
     }
 }
