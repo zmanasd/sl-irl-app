@@ -87,7 +87,14 @@ final class PushNotificationManager: NSObject, ObservableObject {
     }
 
     private func parseAlertEvent(from userInfo: [AnyHashable: Any]) -> AlertEvent? {
-        let payload = (userInfo["alert"] as? [String: Any]) ?? userInfo
+        let payload: [AnyHashable: Any]
+        if let alertPayload = userInfo["alert"] as? [AnyHashable: Any] {
+            payload = alertPayload
+        } else if let alertPayload = userInfo["alert"] as? [String: Any] {
+            payload = Dictionary(uniqueKeysWithValues: alertPayload.map { (AnyHashable($0.key), $0.value) })
+        } else {
+            payload = userInfo
+        }
 
         let alertId = stringValue("alert_id", in: payload) ?? stringValue("id", in: payload)
         if !shouldProcessAlert(id: alertId) { return nil }
@@ -163,7 +170,7 @@ final class PushNotificationManager: NSObject, ObservableObject {
     }
 }
 
-extension PushNotificationManager: UNUserNotificationCenterDelegate {
+extension PushNotificationManager: @preconcurrency UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,

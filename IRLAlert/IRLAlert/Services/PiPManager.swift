@@ -356,7 +356,7 @@ final class PiPManager: NSObject, ObservableObject {
     }
 }
 
-extension PiPManager: AVPictureInPictureControllerDelegate {
+extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = true
         logger.info("PiP starting.")
