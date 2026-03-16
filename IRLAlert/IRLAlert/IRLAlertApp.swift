@@ -33,6 +33,16 @@ struct RootView: View {
                 TabBarView()
             }
         }
+        .background {
+            if shouldKeepPiPHostAttached {
+                // Keep the actual PiP source view attached across the full window so
+                // AVKit can evaluate it like a real playback surface.
+                PiPPlayerHostView()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .animation(.easeInOut(duration: 0.3), value: router.currentFlow)
         .overlay(alignment: .topLeading) {
 #if DEBUG
@@ -77,17 +87,18 @@ struct RootView: View {
         .overlay(alignment: .bottomTrailing) {
             if shouldKeepPiPHostAttached {
                 ZStack(alignment: .bottomLeading) {
-                    PiPPlayerHostView()
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.08, green: 0.12, blue: 0.18),
-                                    Color(red: 0.15, green: 0.21, blue: 0.29)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.08, green: 0.12, blue: 0.18),
+                            Color(red: 0.15, green: 0.21, blue: 0.29)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(.white.opacity(0.04))
+                    )
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("PiP Preview")
