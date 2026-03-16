@@ -15,6 +15,8 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var isPossible: Bool = false
     @Published private(set) var hasAttachedPlayerLayer: Bool = false
     @Published private(set) var hasAttachedPlayerViewController: Bool = false
+    @Published private(set) var hasPiPController: Bool = false
+    @Published private(set) var isBoundLayerStable: Bool = false
     @Published private(set) var isReadyForDisplay: Bool = false
     @Published private(set) var itemStatusDescription: String = "unknown"
     @Published private(set) var timeControlDescription: String = "idle"
@@ -260,12 +262,29 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func ensurePiPControllerBoundToInitialLayer(_ layer: AVPlayerLayer) {
         if pipController == nil {
+            guard isLayerStableForPiP(layer) else {
+                logger.debug("Deferring PiP controller creation until player layer is stable in window.")
+                return
+            }
             pipController = makePiPController(for: layer)
             return
         }
 
-        guard pipController?.playerLayer !== layer else { return }
+        guard let existingLayer = pipController?.playerLayer, existingLayer !== layer else { return }
+        if !isLayerStableForPiP(existingLayer), isLayerStableForPiP(layer), !isActive {
+            logger.notice("Rebinding PiP controller once from unstable initial layer to stable layer.")
+            pipController = makePiPController(for: layer)
+            return
+        }
+
         logger.notice("Ignoring player-layer rebind to preserve single PiP controller lifetime.")
+    }
+
+    private func isLayerStableForPiP(_ layer: AVPlayerLayer) -> Bool {
+        let inHierarchy = layer.superlayer != nil
+        let hasSize = !layer.bounds.isEmpty
+        let hostHasWindow = playerViewController?.view.window != nil || playerViewController == nil
+        return inHierarchy && hasSize && hostHasWindow
     }
 
     private func queueDeferredStart(source: String) {
@@ -789,8 +808,14 @@ final class PiPManager: NSObject, ObservableObject {
     private func refreshDebugState() {
         isSupported = AVPictureInPictureController.isPictureInPictureSupported()
         hasAttachedPlayerViewController = playerViewController != nil
+        hasPiPController = pipController != nil
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
+        if let boundLayer = pipController?.playerLayer {
+            isBoundLayerStable = isLayerStableForPiP(boundLayer)
+        } else {
+            isBoundLayerStable = false
+        }
         isPossible = pipController?.isPictureInPicturePossible ?? false
         if let item = player?.currentItem {
             switch item.status {

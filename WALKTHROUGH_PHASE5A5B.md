@@ -159,6 +159,7 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - Moved `PiPManager` toward a single-controller lifetime policy:
   - create once when the first stable layer is discovered
   - do not rebind/recreate the PiP controller when later layer instances appear
+- Added stability gating for initial controller binding so PiP controller creation is deferred until the hosted layer is attached in-window with non-zero bounds.
 
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
