@@ -1,7 +1,7 @@
 # Phase 5A/5B Implementation Walkthrough (Work So Far)
 
-Date: 2026-03-15
-Branch: codex/feature/phase-5a-5b-implementation
+Date: 2026-03-16
+Branch: codex/fix-xcode-build-errors
 
 ## Context
 Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent audio backgrounding. The goal is to keep alert delivery reliable while staying App Store compliant.
@@ -82,6 +82,67 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 ### 13) Onboarding opt-in step
 - Added onboarding toggles for Push Alerts and Picture-in-Picture.
 
+### 14) Xcode and device-build stabilization
+- Fixed Swift 6 / concurrency build errors that were blocking local Xcode builds.
+- Resolved the missing `SocketIO` package issue in Xcode.
+- Cleaned branch usage so the active Xcode project and the edited worktree matched.
+- Added `.gitignore` coverage for generated `relay-server/node_modules/`.
+
+### 15) On-device PiP diagnostics and runtime instrumentation
+- Added a visible debug badge to the app showing:
+  - PiP enabled state
+  - support state
+  - possibility state
+  - player layer attachment
+  - player readiness
+  - player item readiness
+  - time-control state
+  - last PiP attempt / failure reason
+- Added a visible PiP preview card for runtime confirmation.
+- Added a manual debug control to force PiP start attempts while the app is foregrounded.
+
+### 16) PiP runtime experiments completed
+- Recreated the PiP controller after placeholder generation completed.
+- Added an in-hierarchy `AVPlayerLayer` host view for PiP.
+- Shifted PiP startup timing to the `.inactive` scene phase.
+- Kept the PiP host attached during background transitions.
+- Enabled `canStartPictureInPictureAutomaticallyFromInline`.
+- Set `requiresLinearPlayback = false`.
+- Started the silent audio loop alongside audio session setup during PiP testing.
+- Added state observation for:
+  - `isPictureInPicturePossible`
+  - `isReadyForDisplay`
+  - player item status
+  - player time control status
+- Changed the placeholder asset from video-only to audio+video.
+- Versioned the placeholder filename to prevent stale cached media reuse.
+- Rebound the PiP controller after the visible player layer attached.
+- Moved the actual PiP source host to a full-window background while preserving a small preview card for UI/debugging.
+
+### 17) Physical-device testing completed for current PiP approach
+- Successfully deployed and ran the app on a physical iPhone 12 Pro (iOS 26.0.1).
+- Confirmed the debug overlay and preview card were visible on-device.
+- Confirmed the player entered a technically healthy playback state:
+  - `supported: yes`
+  - `ready: yes`
+  - `item: ready`
+  - `time: playing`
+- PiP still never became eligible:
+  - `possible: no`
+- Manual foreground PiP start attempts did not succeed.
+- Backgrounding the app still did not produce PiP.
+- Returning to foreground showed the debug failure state:
+  - `last: PiP not possible yet`
+
+### 18) Test reporting
+- Added a formal Phase 5A test report:
+  - `IRLAlert/PHASE_5A_TEST_REPORT_2026-03-16.md`
+- The report captures:
+  - simulator outcomes
+  - physical-device outcomes
+  - implementation experiments attempted
+  - current hypothesis and pivot recommendation
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
@@ -110,11 +171,18 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - relay-server/README.md
 - relay-server/package.json
 - relay-server/.env.example
+- IRLAlert/PHASE_5A_TEST_REPORT_2026-03-16.md
+- WALKTHROUGH_PHASE5A5B.md
 
 ## Known Gaps / Next Steps
 1. Configure APNs credentials and validate `/alert` end-to-end delivery.
-2. Refine PiP visuals with a richer rendered view (beyond the placeholder video).
+2. Do not continue iterating on the current placeholder-media PiP path as the primary approach.
+3. Pivot Phase 5A investigation toward a different architecture:
+   - a more AVKit-native playback/PiP path, or
+   - a different background strategy if the true requirement is persistent alert monitoring rather than media playback.
+4. Revisit cleanup of legacy silent-audio code once the replacement direction is chosen.
 
 ## Notes
-- `SilentAudioPlayer` is no longer started on app launch, but the file still exists in the project. It may be removed later once PiP is confirmed stable.
+- During debugging, `SilentAudioPlayer` was temporarily reintroduced into the PiP startup path to test whether AVKit required a stronger active background playback configuration.
 - Push payload parsing uses a flexible schema with fallbacks to avoid drops during early integration.
+- The current branch contains substantial PiP diagnostics intended to support the next implementation angle, not just the current placeholder-media experiment.
