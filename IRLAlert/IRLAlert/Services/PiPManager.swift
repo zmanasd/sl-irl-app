@@ -21,6 +21,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var lastStartAttemptSource: String = "none"
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
+    private let placeholderAssetVersion = 2
     private var pipController: AVPictureInPictureController?
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
@@ -108,6 +109,11 @@ final class PiPManager: NSObject, ObservableObject {
         if playerLayer === layer {
             observePlayerLayer(layer)
             setupPlayerLayerIfNeeded()
+            // Recreate the PiP controller once the visible layer is actually attached.
+            if layer.superlayer != nil && (pipController?.playerLayer !== layer || !isPossible) {
+                pipController = makePiPController(for: layer)
+                refreshDebugState()
+            }
             return
         }
         layer.videoGravity = .resizeAspectFill
@@ -238,7 +244,7 @@ final class PiPManager: NSObject, ObservableObject {
             return nil
         }
 
-        return caches.appendingPathComponent("pip_placeholder.mp4")
+        return caches.appendingPathComponent("pip_placeholder_v\(placeholderAssetVersion).mp4")
     }
 
     private func placeholderVideoURL() -> URL? {
