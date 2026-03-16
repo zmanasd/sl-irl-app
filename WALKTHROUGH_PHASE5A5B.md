@@ -148,6 +148,8 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - Added `PiPManager` support for attaching/reconfiguring a hosted `AVPlayerViewController`.
 - Added runtime layer discovery/rebinding so PiP controller setup uses the AVKit-managed `AVPlayerLayer` when available.
 - Preserved existing PiP diagnostics and expanded debug state to report hosted view-controller attachment.
+- Added deferred PiP start queueing so start attempts wait for `isPictureInPicturePossible` instead of hard-failing on early host timing.
+- Reduced startup race conditions by removing eager PiP prepare calls from audio-engine startup; host attachment now drives preparation.
 - This keeps the current placeholder media for now, but changes the playback surface toward a more AVKit-native architecture.
 
 ## Files Touched

@@ -20,6 +20,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var timeControlDescription: String = "idle"
     @Published private(set) var lastFailureReason: String = "none"
     @Published private(set) var lastStartAttemptSource: String = "none"
+    @Published private(set) var pendingDeferredStartSource: String = "none"
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
     private let placeholderAssetVersion = 2
@@ -37,6 +38,7 @@ final class PiPManager: NSObject, ObservableObject {
     private var startRetryCount = 0
     private let maxStartRetryCount = 3
     private var refreshTask: Task<Void, Never>?
+    private var deferredStartSource: String?
 
     private struct PiPStatusSnapshot {
         var lastAlert: String
@@ -67,7 +69,9 @@ final class PiPManager: NSObject, ObservableObject {
 
         guard let playerLayer else {
             logger.warning("PiP player layer missing. Provide a PiP video source.")
-            lastFailureReason = "PiP player layer missing (host not ready)"
+            lastFailureReason = playerViewController == nil
+                ? "PiP host not attached yet"
+                : "PiP player layer missing (host not ready)"
             return
         }
 
@@ -85,6 +89,7 @@ final class PiPManager: NSObject, ObservableObject {
         bindPlayerLayerFromHostedControllerIfNeeded()
         refreshDebugState()
         guard let pipController else {
+            queueDeferredStart(source: source)
             lastFailureReason = "No PiP controller available"
             if !force {
                 scheduleStartRetry(source: source)
@@ -94,11 +99,13 @@ final class PiPManager: NSObject, ObservableObject {
         player?.play()
         guard force || pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
+            queueDeferredStart(source: source)
             lastFailureReason = "PiP not possible yet"
             scheduleStartRetry(source: source)
             return
         }
         startRetryCount = 0
+        clearDeferredStart()
         lastFailureReason = "none"
         pipController.startPictureInPicture()
     }
@@ -129,6 +136,7 @@ final class PiPManager: NSObject, ObservableObject {
             pipController = makePiPController(for: layer)
         }
         refreshDebugState()
+        attemptDeferredStartIfPossible(trigger: "player layer attached")
         didPrepare = true
     }
 
@@ -142,6 +150,7 @@ final class PiPManager: NSObject, ObservableObject {
         setupPlayerLayerIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
         refreshDebugState()
+        attemptDeferredStartIfPossible(trigger: "host attached")
         didPrepare = true
     }
 
@@ -160,6 +169,10 @@ final class PiPManager: NSObject, ObservableObject {
     }
 
     func ensurePreviewPlayback() {
+        guard playerViewController != nil || playerLayer != nil else {
+            lastFailureReason = "Waiting for PiP host attachment"
+            return
+        }
         prepareIfNeeded()
         player?.play()
         refreshDebugState()
@@ -205,6 +218,27 @@ final class PiPManager: NSObject, ObservableObject {
         }
 
         refreshDebugState()
+    }
+
+    private func queueDeferredStart(source: String) {
+        deferredStartSource = source
+        pendingDeferredStartSource = source
+    }
+
+    private func clearDeferredStart() {
+        deferredStartSource = nil
+        pendingDeferredStartSource = "none"
+    }
+
+    private func attemptDeferredStartIfPossible(trigger: String) {
+        guard let pipController, let queuedSource = deferredStartSource else { return }
+        guard pipController.isPictureInPicturePossible else { return }
+
+        clearDeferredStart()
+        startRetryCount = 0
+        lastStartAttemptSource = "\(queuedSource) -> \(trigger)"
+        lastFailureReason = "none"
+        pipController.startPictureInPicture()
     }
 
     private func configurePlayerViewController(_ controller: AVPlayerViewController) {
@@ -265,6 +299,9 @@ final class PiPManager: NSObject, ObservableObject {
             let isPossible = observedController.isPictureInPicturePossible
             Task { @MainActor in
                 self?.isPossible = isPossible
+                if isPossible {
+                    self?.attemptDeferredStartIfPossible(trigger: "possible=true")
+                }
             }
         }
         return controller
@@ -764,6 +801,7 @@ extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         let nsError = error as NSError
         lastFailureReason = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
+        queueDeferredStart(source: lastStartAttemptSource)
         refreshDebugState()
         logger.error("PiP failed to start: \(error.localizedDescription)")
     }

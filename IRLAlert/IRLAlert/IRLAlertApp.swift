@@ -60,6 +60,12 @@ struct RootView: View {
                         Text("attempt: \(pipManager.lastStartAttemptSource)")
                             .font(.caption2)
                     }
+                    if pipManager.pendingDeferredStartSource != "none" {
+                        Text("pending: \(pipManager.pendingDeferredStartSource)")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if pipManager.lastFailureReason != "none" {
                         Text("last: \(pipManager.lastFailureReason)")
                             .font(.caption2)
@@ -171,7 +177,6 @@ struct RootView: View {
     private func startAudioEngine() {
         AudioSessionManager.shared.configureSession()
         SilentAudioPlayer.shared.start()
-        PiPManager.shared.prepareIfNeeded()
     }
 
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
