@@ -34,13 +34,33 @@ struct RootView: View {
             }
         }
         .background {
-            if shouldKeepPiPHostAttached {
+            if shouldKeepPiPHostAttached && !pipManager.isBaselineRealMediaMode {
                 // Keep the actual PiP source view attached across the full window so
                 // AVKit can evaluate it like a real playback surface.
                 PiPPlayerHostView()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
+            }
+        }
+        .overlay {
+            if shouldKeepPiPHostAttached && pipManager.isBaselineRealMediaMode {
+                // Step 1 baseline path: keep a real inline player visibly filling the window.
+                PiPPlayerHostView()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .overlay(alignment: .bottomLeading) {
+                        Text("Baseline PiP Inline Media")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.65))
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                            .padding(.leading, 16)
+                            .padding(.bottom, 24)
+                    }
             }
         }
         .animation(.easeInOut(duration: 0.3), value: router.currentFlow)
@@ -53,6 +73,8 @@ struct RootView: View {
                     Text("enabled: \(appSettings.pipEnabled ? "on" : "off")  supported: \(pipManager.isSupported ? "yes" : "no")  possible: \(pipManager.isPossible ? "yes" : "no")")
                         .font(.caption2)
                     Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  vc: \(pipManager.hasAttachedPlayerViewController ? "yes" : "no")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
+                        .font(.caption2)
+                    Text("mode: \(pipManager.playbackModeDebugLabel)")
                         .font(.caption2)
                     Text("ready: \(pipManager.isReadyForDisplay ? "yes" : "no")  item: \(pipManager.itemStatusDescription)  time: \(pipManager.timeControlDescription)")
                         .font(.caption2)
@@ -91,7 +113,7 @@ struct RootView: View {
 #endif
         }
         .overlay(alignment: .bottomTrailing) {
-            if shouldKeepPiPHostAttached {
+            if shouldKeepPiPHostAttached && !pipManager.isBaselineRealMediaMode {
                 ZStack(alignment: .bottomLeading) {
                     LinearGradient(
                         colors: [
@@ -176,7 +198,11 @@ struct RootView: View {
     /// Configure and start the background audio engine when entering the main flow.
     private func startAudioEngine() {
         AudioSessionManager.shared.configureSession()
-        SilentAudioPlayer.shared.start()
+        if pipManager.isBaselineRealMediaMode {
+            SilentAudioPlayer.shared.stop()
+        } else {
+            SilentAudioPlayer.shared.start()
+        }
     }
 
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {

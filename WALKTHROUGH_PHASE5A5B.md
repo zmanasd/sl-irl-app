@@ -152,6 +152,14 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - Reduced startup race conditions by removing eager PiP prepare calls from audio-engine startup; host attachment now drives preparation.
 - This keeps the current placeholder media for now, but changes the playback surface toward a more AVKit-native architecture.
 
+### 20) Step 1 + Step 2 pivot implementation started
+- Added a baseline PiP playback mode that uses real media (`AVPlayerItem`) instead of regenerated placeholder status frames in Debug builds.
+- Updated the app UI hosting path so baseline mode uses a visible full-window inline `AVPlayerViewController` host for PiP eligibility testing.
+- Enforced strict startup order in `PiPManager`: audio session activation happens before controller setup/start attempts.
+- Moved `PiPManager` toward a single-controller lifetime policy:
+  - create once when the first stable layer is discovered
+  - do not rebind/recreate the PiP controller when later layer instances appear
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift

@@ -22,8 +22,28 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var lastStartAttemptSource: String = "none"
     @Published private(set) var pendingDeferredStartSource: String = "none"
 
+    private enum PlaybackMode {
+        case baselineRealMedia
+        case statusPlaceholder
+
+        var debugLabel: String {
+            switch self {
+            case .baselineRealMedia:
+                return "baseline-real-media"
+            case .statusPlaceholder:
+                return "status-placeholder"
+            }
+        }
+    }
+
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
     private let placeholderAssetVersion = 2
+    private let baselineMediaURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")
+#if DEBUG
+    private let playbackMode: PlaybackMode = .baselineRealMedia
+#else
+    private let playbackMode: PlaybackMode = .statusPlaceholder
+#endif
     private var pipController: AVPictureInPictureController?
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
@@ -52,6 +72,14 @@ final class PiPManager: NSObject, ObservableObject {
         queueCount: 0
     )
 
+    var isBaselineRealMediaMode: Bool {
+        playbackMode == .baselineRealMedia
+    }
+
+    var playbackModeDebugLabel: String {
+        playbackMode.debugLabel
+    }
+
     // MARK: - Public API
 
     func prepareIfNeeded() {
@@ -64,6 +92,8 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
 
+        // Step 2 ordering: activate audio session before creating/starting PiP controller.
+        AudioSessionManager.shared.configureSession()
         setupPlayerLayerIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
 
@@ -75,9 +105,7 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
 
-        if pipController == nil {
-            pipController = makePiPController(for: playerLayer)
-        }
+        ensurePiPControllerBoundToInitialLayer(playerLayer)
         player?.play()
         refreshDebugState()
         didPrepare = true
@@ -120,11 +148,7 @@ final class PiPManager: NSObject, ObservableObject {
         if playerLayer === layer {
             observePlayerLayer(layer)
             setupPlayerLayerIfNeeded()
-            // Recreate the PiP controller once the visible layer is actually attached.
-            if layer.superlayer != nil && (pipController?.playerLayer !== layer || !isPossible) {
-                pipController = makePiPController(for: layer)
-                refreshDebugState()
-            }
+            ensurePiPControllerBoundToInitialLayer(layer)
             return
         }
         layer.videoGravity = .resizeAspectFill
@@ -132,9 +156,7 @@ final class PiPManager: NSObject, ObservableObject {
         hasAttachedPlayerLayer = true
         observePlayerLayer(layer)
         setupPlayerLayerIfNeeded()
-        if pipController == nil || pipController?.playerLayer !== layer {
-            pipController = makePiPController(for: layer)
-        }
+        ensurePiPControllerBoundToInitialLayer(layer)
         refreshDebugState()
         attemptDeferredStartIfPossible(trigger: "player layer attached")
         didPrepare = true
@@ -165,7 +187,9 @@ final class PiPManager: NSObject, ObservableObject {
             statusSnapshot.queueCount = queueCount
         }
 
-        schedulePlaceholderRefresh()
+        if playbackMode == .statusPlaceholder {
+            schedulePlaceholderRefresh()
+        }
     }
 
     func ensurePreviewPlayback() {
@@ -182,13 +206,20 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func setupPlayerLayerIfNeeded() {
         if player == nil {
-            guard let url = placeholderVideoURL() else { return }
-            let item = AVPlayerItem(url: url)
+            guard let item = makeInitialPlayerItem() else {
+                if playbackMode == .baselineRealMedia {
+                    lastFailureReason = "Baseline media source unavailable"
+                } else {
+                    lastFailureReason = "PiP placeholder unavailable"
+                }
+                return
+            }
             setPlayerItem(item)
             let newPlayer = AVPlayer(playerItem: item)
-            newPlayer.isMuted = true
+            newPlayer.isMuted = playbackMode != .baselineRealMedia
             newPlayer.actionAtItemEnd = .none
             newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
+            newPlayer.automaticallyWaitsToMinimizeStalling = true
             player = newPlayer
             observePlayer(newPlayer)
         }
@@ -202,22 +233,39 @@ final class PiPManager: NSObject, ObservableObject {
                 if existingLayer.player !== player {
                     existingLayer.player = player
                 }
-            } else if playerViewController == nil {
-                let layer = AVPlayerLayer(player: player)
-                layer.videoGravity = .resizeAspectFill
-                playerLayer = layer
-                hasAttachedPlayerLayer = true
-                observePlayerLayer(layer)
             }
         }
 
         bindPlayerLayerFromHostedControllerIfNeeded()
-
-        if pipController == nil, let playerLayer {
-            pipController = makePiPController(for: playerLayer)
+        if let playerLayer {
+            ensurePiPControllerBoundToInitialLayer(playerLayer)
         }
 
         refreshDebugState()
+    }
+
+    private func makeInitialPlayerItem() -> AVPlayerItem? {
+        switch playbackMode {
+        case .baselineRealMedia:
+            if let bundledClip = Bundle.main.url(forResource: "pip_baseline", withExtension: "mp4") {
+                return AVPlayerItem(url: bundledClip)
+            }
+            guard let baselineMediaURL else { return nil }
+            return AVPlayerItem(url: baselineMediaURL)
+        case .statusPlaceholder:
+            guard let url = placeholderVideoURL() else { return nil }
+            return AVPlayerItem(url: url)
+        }
+    }
+
+    private func ensurePiPControllerBoundToInitialLayer(_ layer: AVPlayerLayer) {
+        if pipController == nil {
+            pipController = makePiPController(for: layer)
+            return
+        }
+
+        guard pipController?.playerLayer !== layer else { return }
+        logger.notice("Ignoring player-layer rebind to preserve single PiP controller lifetime.")
     }
 
     private func queueDeferredStart(source: String) {
@@ -264,11 +312,9 @@ final class PiPManager: NSObject, ObservableObject {
         if playerLayer !== discoveredLayer {
             playerLayer = discoveredLayer
             observePlayerLayer(discoveredLayer)
-            pipController = makePiPController(for: discoveredLayer)
-        } else if pipController == nil {
-            pipController = makePiPController(for: discoveredLayer)
         }
 
+        ensurePiPControllerBoundToInitialLayer(discoveredLayer)
         hasAttachedPlayerLayer = true
     }
 
