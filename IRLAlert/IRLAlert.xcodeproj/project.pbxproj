@@ -105,13 +105,13 @@
 		BAE3D760213D2C420FF8AB72 /* DashboardVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVM.swift; sourceTree = "<group>"; };
 		BFF28462DB803A303269851C /* AlertType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertType.swift; sourceTree = "<group>"; };
 		C94E878175E4AEFA24301CEF /* TTSManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManager.swift; sourceTree = "<group>"; };
-		CF7F245F14479757ACCBC502 /* IRLAlertNotificationService.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = IRLAlertNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF7F245F14479757ACCBC502 /* IRLAlertNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = IRLAlertNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DB5F7E66C382AB281C1D660E /* AlertTestingVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTestingVM.swift; sourceTree = "<group>"; };
 		DC5F2A159090B4916BE174E6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		E22234A40B6067C00E869A1D /* DisconnectMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectMonitor.swift; sourceTree = "<group>"; };
 		E3284E64F36F8948755F99A5 /* AlertServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertServiceProtocol.swift; sourceTree = "<group>"; };
 		E9F60306B910E4A21310F44C /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
-		EB6B830C3A28C3D111328BFC /* IRLAlert.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IRLAlert.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB6B830C3A28C3D111328BFC /* IRLAlert.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IRLAlert.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F43C068E23DB4C2189CBE85C /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		F91E7423A57CE8BF2C3C8B61 /* AlertTestingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertTestingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -280,14 +280,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					0D705DD003F19B53E793C8E0 = {
-						ProvisioningStyle = Automatic;
-					};
-					9FED6A45DF8A0588AA9CC5DF = {
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = 2241FFA810AF0372B9D7E628 /* Build configuration list for PBXProject "IRLAlert" */;
 			developmentRegion = en;
@@ -299,7 +291,7 @@
 			mainGroup = 79105C5662420FEEDDBA3610;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 81D6B15E0C1A25F8702DF6C9 /* Products */;
@@ -441,16 +433,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IRLAlert/IRLAlert.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "IRL Alert";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIBackgroundModes = (
-					audio,
-					"picture-in-picture",
-				);
+				INFOPLIST_KEY_UIBackgroundModes = "audio picture-in-picture";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -459,6 +449,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -468,7 +459,9 @@
 		B91E17F308AFEA0296755A05 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				INFOPLIST_FILE = IRLAlertNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -477,6 +470,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app.notificationservice;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -486,7 +480,9 @@
 		DD3F1C0F3949115D02FC8CB7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				INFOPLIST_FILE = IRLAlertNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -495,6 +491,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app.notificationservice;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -506,16 +503,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IRLAlert/IRLAlert.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "IRL Alert";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIBackgroundModes = (
-					audio,
-					"picture-in-picture",
-				);
+				INFOPLIST_KEY_UIBackgroundModes = "audio picture-in-picture";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -524,6 +519,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -631,7 +627,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+		555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
 			requirement = {
@@ -644,7 +640,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		D0DD298C84AABFA10A94AF94 /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			package = 555C2DBD6E82C1E302B9ABE1 /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
