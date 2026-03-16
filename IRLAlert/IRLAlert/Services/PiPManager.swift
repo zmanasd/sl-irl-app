@@ -14,6 +14,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var isSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
     @Published private(set) var isPossible: Bool = false
     @Published private(set) var hasAttachedPlayerLayer: Bool = false
+    @Published private(set) var hasAttachedPlayerViewController: Bool = false
     @Published private(set) var isReadyForDisplay: Bool = false
     @Published private(set) var itemStatusDescription: String = "unknown"
     @Published private(set) var timeControlDescription: String = "idle"
@@ -26,6 +27,7 @@ final class PiPManager: NSObject, ObservableObject {
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var playerLayer: AVPlayerLayer?
+    private weak var playerViewController: AVPlayerViewController?
     private var pipPossibleObservation: NSKeyValueObservation?
     private var playerLayerReadyObservation: NSKeyValueObservation?
     private var playerTimeControlObservation: NSKeyValueObservation?
@@ -61,10 +63,11 @@ final class PiPManager: NSObject, ObservableObject {
         }
 
         setupPlayerLayerIfNeeded()
+        bindPlayerLayerFromHostedControllerIfNeeded()
 
         guard let playerLayer else {
             logger.warning("PiP player layer missing. Provide a PiP video source.")
-            lastFailureReason = "PiP player layer missing"
+            lastFailureReason = "PiP player layer missing (host not ready)"
             return
         }
 
@@ -79,6 +82,7 @@ final class PiPManager: NSObject, ObservableObject {
     func startIfPossible(source: String = "app", force: Bool = false) {
         lastStartAttemptSource = source
         prepareIfNeeded()
+        bindPlayerLayerFromHostedControllerIfNeeded()
         refreshDebugState()
         guard let pipController else {
             lastFailureReason = "No PiP controller available"
@@ -128,6 +132,19 @@ final class PiPManager: NSObject, ObservableObject {
         didPrepare = true
     }
 
+    /// Attach a hosted AVPlayerViewController so PiP uses AVKit-native playback surfaces.
+    func setPlayerViewController(_ controller: AVPlayerViewController) {
+        if playerViewController !== controller {
+            playerViewController = controller
+        }
+        hasAttachedPlayerViewController = true
+        configurePlayerViewController(controller)
+        setupPlayerLayerIfNeeded()
+        bindPlayerLayerFromHostedControllerIfNeeded()
+        refreshDebugState()
+        didPrepare = true
+    }
+
     func updateStatus(lastAlert: String? = nil, isConnected: Bool? = nil, queueCount: Int? = nil) {
         if let lastAlert, !lastAlert.isEmpty {
             statusSnapshot.lastAlert = lastAlert
@@ -163,12 +180,16 @@ final class PiPManager: NSObject, ObservableObject {
             observePlayer(newPlayer)
         }
 
+        if let playerViewController {
+            configurePlayerViewController(playerViewController)
+        }
+
         if let player {
             if let existingLayer = playerLayer {
                 if existingLayer.player !== player {
                     existingLayer.player = player
                 }
-            } else {
+            } else if playerViewController == nil {
                 let layer = AVPlayerLayer(player: player)
                 layer.videoGravity = .resizeAspectFill
                 playerLayer = layer
@@ -177,11 +198,57 @@ final class PiPManager: NSObject, ObservableObject {
             }
         }
 
+        bindPlayerLayerFromHostedControllerIfNeeded()
+
         if pipController == nil, let playerLayer {
             pipController = makePiPController(for: playerLayer)
         }
 
         refreshDebugState()
+    }
+
+    private func configurePlayerViewController(_ controller: AVPlayerViewController) {
+        controller.player = player
+        controller.showsPlaybackControls = false
+        controller.allowsPictureInPicturePlayback = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        controller.updatesNowPlayingInfoCenter = false
+        controller.videoGravity = .resizeAspectFill
+    }
+
+    private func bindPlayerLayerFromHostedControllerIfNeeded() {
+        guard let playerViewController else { return }
+        guard let discoveredLayer = findPlayerLayer(in: playerViewController.view.layer) else {
+            hasAttachedPlayerLayer = playerLayer != nil
+            return
+        }
+
+        if discoveredLayer.player !== player {
+            discoveredLayer.player = player
+        }
+
+        if playerLayer !== discoveredLayer {
+            playerLayer = discoveredLayer
+            observePlayerLayer(discoveredLayer)
+            pipController = makePiPController(for: discoveredLayer)
+        } else if pipController == nil {
+            pipController = makePiPController(for: discoveredLayer)
+        }
+
+        hasAttachedPlayerLayer = true
+    }
+
+    private func findPlayerLayer(in rootLayer: CALayer?) -> AVPlayerLayer? {
+        guard let rootLayer else { return nil }
+        if let foundLayer = rootLayer as? AVPlayerLayer {
+            return foundLayer
+        }
+        for sublayer in rootLayer.sublayers ?? [] {
+            if let foundLayer = findPlayerLayer(in: sublayer) {
+                return foundLayer
+            }
+        }
+        return nil
     }
 
     private func makePiPController(for playerLayer: AVPlayerLayer) -> AVPictureInPictureController? {
@@ -638,6 +705,7 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func refreshDebugState() {
         isSupported = AVPictureInPictureController.isPictureInPictureSupported()
+        hasAttachedPlayerViewController = playerViewController != nil
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
         isPossible = pipController?.isPictureInPicturePossible ?? false

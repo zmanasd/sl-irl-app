@@ -1,20 +1,38 @@
 import AVKit
 import SwiftUI
 
-/// Hosts an AVPlayerLayer in the view hierarchy so PiP can start.
-struct PiPPlayerHostView: UIViewRepresentable {
-    func makeUIView(context: Context) -> PlayerHostView {
-        let view = PlayerHostView()
-        PiPManager.shared.setPlayerLayer(view.playerLayer)
-        return view
+/// Hosts an AVPlayerViewController in the view hierarchy so PiP runs through AVKit-native playback.
+struct PiPPlayerHostView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> PlayerHostViewController {
+        let controller = PlayerHostViewController()
+        PiPManager.shared.setPlayerViewController(controller)
+        return controller
     }
 
-    func updateUIView(_ uiView: PlayerHostView, context: Context) {
-        PiPManager.shared.setPlayerLayer(uiView.playerLayer)
+    func updateUIViewController(_ uiViewController: PlayerHostViewController, context: Context) {
+        PiPManager.shared.setPlayerViewController(uiViewController)
     }
 
-    final class PlayerHostView: UIView {
-        override class var layerClass: AnyClass { AVPlayerLayer.self }
-        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    final class PlayerHostViewController: AVPlayerViewController {
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            configureForHostUsage()
+            PiPManager.shared.setPlayerViewController(self)
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            PiPManager.shared.setPlayerViewController(self)
+        }
+
+        private func configureForHostUsage() {
+            view.backgroundColor = .clear
+            showsPlaybackControls = false
+            allowsPictureInPicturePlayback = true
+            canStartPictureInPictureAutomaticallyFromInline = true
+            updatesNowPlayingInfoCenter = false
+            videoGravity = .resizeAspectFill
+            view.isUserInteractionEnabled = false
+        }
     }
 }

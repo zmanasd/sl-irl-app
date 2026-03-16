@@ -143,6 +143,13 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
   - implementation experiments attempted
   - current hypothesis and pivot recommendation
 
+### 19) Pivot follow-up: AVKit-native host path (in progress)
+- Switched PiP host rendering from a custom `UIView` + direct `AVPlayerLayer` path to an embedded `AVPlayerViewController` host.
+- Added `PiPManager` support for attaching/reconfiguring a hosted `AVPlayerViewController`.
+- Added runtime layer discovery/rebinding so PiP controller setup uses the AVKit-managed `AVPlayerLayer` when available.
+- Preserved existing PiP diagnostics and expanded debug state to report hosted view-controller attachment.
+- This keeps the current placeholder media for now, but changes the playback surface toward a more AVKit-native architecture.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
