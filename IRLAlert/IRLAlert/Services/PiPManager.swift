@@ -75,17 +75,19 @@ final class PiPManager: NSObject, ObservableObject {
         didPrepare = true
     }
 
-    func startIfPossible(source: String = "app") {
+    func startIfPossible(source: String = "app", force: Bool = false) {
         lastStartAttemptSource = source
         prepareIfNeeded()
         refreshDebugState()
         guard let pipController else {
             lastFailureReason = "No PiP controller available"
-            scheduleStartRetry(source: source)
+            if !force {
+                scheduleStartRetry(source: source)
+            }
             return
         }
         player?.play()
-        guard pipController.isPictureInPicturePossible else {
+        guard force || pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
             lastFailureReason = "PiP not possible yet"
             scheduleStartRetry(source: source)
@@ -546,7 +548,8 @@ extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     }
 
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        lastFailureReason = error.localizedDescription
+        let nsError = error as NSError
+        lastFailureReason = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
         refreshDebugState()
         logger.error("PiP failed to start: \(error.localizedDescription)")
     }

@@ -56,8 +56,8 @@ struct RootView: View {
                             .foregroundStyle(.yellow)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Button("Start PiP") {
-                        pipManager.startIfPossible(source: "debug button")
+                    Button("Force Start PiP") {
+                        pipManager.startIfPossible(source: "debug button", force: true)
                     }
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
