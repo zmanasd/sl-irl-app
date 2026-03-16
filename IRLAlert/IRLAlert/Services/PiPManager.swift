@@ -39,8 +39,7 @@ final class PiPManager: NSObject, ObservableObject {
     // MARK: - Public API
 
     func prepareIfNeeded() {
-        guard !didPrepare else { return }
-        didPrepare = true
+        if didPrepare, pipController != nil { return }
 
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
             logger.warning("PiP not supported on this device.")
@@ -55,8 +54,12 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
 
-        pipController = AVPictureInPictureController(playerLayer: playerLayer)
-        pipController?.delegate = self
+        if pipController == nil {
+            pipController = AVPictureInPictureController(playerLayer: playerLayer)
+            pipController?.delegate = self
+        }
+        player?.play()
+        didPrepare = true
     }
 
     func startIfPossible() {
@@ -65,12 +68,13 @@ final class PiPManager: NSObject, ObservableObject {
             scheduleStartRetry()
             return
         }
+        player?.play()
         guard pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
+            scheduleStartRetry()
             return
         }
         startRetryCount = 0
-        player?.play()
         pipController.startPictureInPicture()
     }
 
@@ -81,9 +85,18 @@ final class PiPManager: NSObject, ObservableObject {
 
     /// Optionally provide a custom player layer (e.g., for a richer PiP view).
     func setPlayerLayer(_ layer: AVPlayerLayer) {
+        if playerLayer === layer {
+            setupPlayerLayerIfNeeded()
+            return
+        }
+        layer.videoGravity = .resizeAspectFill
         playerLayer = layer
-        pipController = AVPictureInPictureController(playerLayer: layer)
-        pipController?.delegate = self
+        setupPlayerLayerIfNeeded()
+        if pipController == nil || pipController?.playerLayer !== layer {
+            pipController = AVPictureInPictureController(playerLayer: layer)
+            pipController?.delegate = self
+        }
+        didPrepare = true
     }
 
     func updateStatus(lastAlert: String? = nil, isConnected: Bool? = nil, queueCount: Int? = nil) {
@@ -100,22 +113,40 @@ final class PiPManager: NSObject, ObservableObject {
         schedulePlaceholderRefresh()
     }
 
+    func ensurePreviewPlayback() {
+        prepareIfNeeded()
+        player?.play()
+    }
+
     // MARK: - Private Helpers
 
     private func setupPlayerLayerIfNeeded() {
-        guard player == nil else { return }
+        if player == nil {
+            guard let url = placeholderVideoURL() else { return }
+            let item = AVPlayerItem(url: url)
+            setPlayerItem(item)
+            let newPlayer = AVPlayer(playerItem: item)
+            newPlayer.isMuted = true
+            newPlayer.actionAtItemEnd = .none
+            player = newPlayer
+        }
 
-        guard let url = placeholderVideoURL() else { return }
+        if let player {
+            if let existingLayer = playerLayer {
+                if existingLayer.player !== player {
+                    existingLayer.player = player
+                }
+            } else {
+                let layer = AVPlayerLayer(player: player)
+                layer.videoGravity = .resizeAspectFill
+                playerLayer = layer
+            }
+        }
 
-        let item = AVPlayerItem(url: url)
-        setPlayerItem(item)
-        player = AVPlayer(playerItem: item)
-        player?.isMuted = true
-        player?.actionAtItemEnd = .none
-
-        let layer = AVPlayerLayer(player: player)
-        layer.videoGravity = .resizeAspectFill
-        playerLayer = layer
+        if pipController == nil, let playerLayer {
+            pipController = AVPictureInPictureController(playerLayer: playerLayer)
+            pipController?.delegate = self
+        }
     }
 
     @objc private func loopPlayerItem() {
@@ -145,6 +176,9 @@ final class PiPManager: NSObject, ObservableObject {
 
         Task.detached { [weak self] in
             await self?.generatePlaceholderVideo(at: url)
+            await MainActor.run {
+                PiPManager.shared.setupPlayerLayerIfNeeded()
+            }
         }
 
         return nil
