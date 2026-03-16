@@ -12,12 +12,23 @@ final class PiPManager: NSObject, ObservableObject {
 
     @Published private(set) var isActive: Bool = false
     @Published private(set) var isSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
+    @Published private(set) var isPossible: Bool = false
+    @Published private(set) var hasAttachedPlayerLayer: Bool = false
+    @Published private(set) var isReadyForDisplay: Bool = false
+    @Published private(set) var itemStatusDescription: String = "unknown"
+    @Published private(set) var timeControlDescription: String = "idle"
+    @Published private(set) var lastFailureReason: String = "none"
+    @Published private(set) var lastStartAttemptSource: String = "none"
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
     private var pipController: AVPictureInPictureController?
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var playerLayer: AVPlayerLayer?
+    private var pipPossibleObservation: NSKeyValueObservation?
+    private var playerLayerReadyObservation: NSKeyValueObservation?
+    private var playerTimeControlObservation: NSKeyValueObservation?
+    private var playerItemStatusObservation: NSKeyValueObservation?
     private var didPrepare = false
     private var isGeneratingPlaceholder = false
     private var startRetryCount = 0
@@ -44,6 +55,7 @@ final class PiPManager: NSObject, ObservableObject {
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
             logger.warning("PiP not supported on this device.")
             isSupported = false
+            lastFailureReason = "PiP unsupported on this device"
             return
         }
 
@@ -51,30 +63,36 @@ final class PiPManager: NSObject, ObservableObject {
 
         guard let playerLayer else {
             logger.warning("PiP player layer missing. Provide a PiP video source.")
+            lastFailureReason = "PiP player layer missing"
             return
         }
 
         if pipController == nil {
-            pipController = AVPictureInPictureController(playerLayer: playerLayer)
-            pipController?.delegate = self
+            pipController = makePiPController(for: playerLayer)
         }
         player?.play()
+        refreshDebugState()
         didPrepare = true
     }
 
-    func startIfPossible() {
+    func startIfPossible(source: String = "app") {
+        lastStartAttemptSource = source
         prepareIfNeeded()
+        refreshDebugState()
         guard let pipController else {
-            scheduleStartRetry()
+            lastFailureReason = "No PiP controller available"
+            scheduleStartRetry(source: source)
             return
         }
         player?.play()
         guard pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
-            scheduleStartRetry()
+            lastFailureReason = "PiP not possible yet"
+            scheduleStartRetry(source: source)
             return
         }
         startRetryCount = 0
+        lastFailureReason = "none"
         pipController.startPictureInPicture()
     }
 
@@ -86,16 +104,19 @@ final class PiPManager: NSObject, ObservableObject {
     /// Optionally provide a custom player layer (e.g., for a richer PiP view).
     func setPlayerLayer(_ layer: AVPlayerLayer) {
         if playerLayer === layer {
+            observePlayerLayer(layer)
             setupPlayerLayerIfNeeded()
             return
         }
         layer.videoGravity = .resizeAspectFill
         playerLayer = layer
+        hasAttachedPlayerLayer = true
+        observePlayerLayer(layer)
         setupPlayerLayerIfNeeded()
         if pipController == nil || pipController?.playerLayer !== layer {
-            pipController = AVPictureInPictureController(playerLayer: layer)
-            pipController?.delegate = self
+            pipController = makePiPController(for: layer)
         }
+        refreshDebugState()
         didPrepare = true
     }
 
@@ -116,6 +137,7 @@ final class PiPManager: NSObject, ObservableObject {
     func ensurePreviewPlayback() {
         prepareIfNeeded()
         player?.play()
+        refreshDebugState()
     }
 
     // MARK: - Private Helpers
@@ -128,7 +150,9 @@ final class PiPManager: NSObject, ObservableObject {
             let newPlayer = AVPlayer(playerItem: item)
             newPlayer.isMuted = true
             newPlayer.actionAtItemEnd = .none
+            newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
             player = newPlayer
+            observePlayer(newPlayer)
         }
 
         if let player {
@@ -140,12 +164,63 @@ final class PiPManager: NSObject, ObservableObject {
                 let layer = AVPlayerLayer(player: player)
                 layer.videoGravity = .resizeAspectFill
                 playerLayer = layer
+                hasAttachedPlayerLayer = true
+                observePlayerLayer(layer)
             }
         }
 
         if pipController == nil, let playerLayer {
-            pipController = AVPictureInPictureController(playerLayer: playerLayer)
-            pipController?.delegate = self
+            pipController = makePiPController(for: playerLayer)
+        }
+
+        refreshDebugState()
+    }
+
+    private func makePiPController(for playerLayer: AVPlayerLayer) -> AVPictureInPictureController? {
+        guard let controller = AVPictureInPictureController(playerLayer: playerLayer) else {
+            logger.error("Failed to create PiP controller for player layer.")
+            lastFailureReason = "Failed to create PiP controller"
+            return nil
+        }
+
+        controller.delegate = self
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        controller.requiresLinearPlayback = false
+        pipPossibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observedController, _ in
+            let isPossible = observedController.isPictureInPicturePossible
+            Task { @MainActor in
+                self?.isPossible = isPossible
+            }
+        }
+        return controller
+    }
+
+    private func observePlayer(_ player: AVPlayer) {
+        playerTimeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] observedPlayer, _ in
+            let description: String
+            switch observedPlayer.timeControlStatus {
+            case .paused:
+                description = "paused"
+            case .waitingToPlayAtSpecifiedRate:
+                description = "waiting"
+            case .playing:
+                description = "playing"
+            @unknown default:
+                description = "unknown"
+            }
+
+            Task { @MainActor in
+                self?.timeControlDescription = description
+            }
+        }
+    }
+
+    private func observePlayerLayer(_ layer: AVPlayerLayer) {
+        playerLayerReadyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] observedLayer, _ in
+            let ready = observedLayer.isReadyForDisplay
+            Task { @MainActor in
+                self?.isReadyForDisplay = ready
+            }
         }
     }
 
@@ -184,12 +259,12 @@ final class PiPManager: NSObject, ObservableObject {
         return nil
     }
 
-    private func scheduleStartRetry() {
+    private func scheduleStartRetry(source: String) {
         guard startRetryCount < maxStartRetryCount else { return }
         startRetryCount += 1
         Task {
             try? await Task.sleep(nanoseconds: 400_000_000)
-            self.startIfPossible()
+            self.startIfPossible(source: "\(source) retry \(self.startRetryCount)")
         }
     }
 
@@ -211,6 +286,7 @@ final class PiPManager: NSObject, ObservableObject {
         }
 
         playerItem = item
+        observePlayerItem(item)
 
         NotificationCenter.default.addObserver(
             self,
@@ -218,6 +294,29 @@ final class PiPManager: NSObject, ObservableObject {
             name: .AVPlayerItemDidPlayToEndTime,
             object: item
         )
+    }
+
+    private func observePlayerItem(_ item: AVPlayerItem) {
+        playerItemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
+            let description: String
+            switch observedItem.status {
+            case .unknown:
+                description = "unknown"
+            case .readyToPlay:
+                description = "ready"
+            case .failed:
+                description = "failed"
+            @unknown default:
+                description = "unknown"
+            }
+
+            Task { @MainActor in
+                self?.itemStatusDescription = description
+                if observedItem.status == .failed {
+                    self?.lastFailureReason = observedItem.error?.localizedDescription ?? "Player item failed"
+                }
+            }
+        }
     }
 
     private func regeneratePlaceholderVideo() async {
@@ -388,11 +487,49 @@ final class PiPManager: NSObject, ObservableObject {
 
         return buffer
     }
+
+    private func refreshDebugState() {
+        isSupported = AVPictureInPictureController.isPictureInPictureSupported()
+        hasAttachedPlayerLayer = playerLayer != nil
+        isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
+        isPossible = pipController?.isPictureInPicturePossible ?? false
+        if let item = player?.currentItem {
+            switch item.status {
+            case .unknown:
+                itemStatusDescription = "unknown"
+            case .readyToPlay:
+                itemStatusDescription = "ready"
+            case .failed:
+                itemStatusDescription = "failed"
+            @unknown default:
+                itemStatusDescription = "unknown"
+            }
+        } else {
+            itemStatusDescription = "missing"
+        }
+
+        if let player {
+            switch player.timeControlStatus {
+            case .paused:
+                timeControlDescription = "paused"
+            case .waitingToPlayAtSpecifiedRate:
+                timeControlDescription = "waiting"
+            case .playing:
+                timeControlDescription = "playing"
+            @unknown default:
+                timeControlDescription = "unknown"
+            }
+        } else {
+            timeControlDescription = "missing"
+        }
+    }
 }
 
 extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = true
+        lastFailureReason = "none"
+        refreshDebugState()
         logger.info("PiP starting.")
         Task { await RelayClient.shared.updatePresence(directConnectionActive: true) }
     }
@@ -403,11 +540,14 @@ extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = false
+        refreshDebugState()
         logger.info("PiP stopped.")
         Task { await RelayClient.shared.updatePresence(directConnectionActive: UIApplication.shared.applicationState == .active) }
     }
 
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        lastFailureReason = error.localizedDescription
+        refreshDebugState()
         logger.error("PiP failed to start: \(error.localizedDescription)")
     }
 }

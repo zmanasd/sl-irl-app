@@ -40,10 +40,30 @@ struct RootView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PiP Debug Build")
                         .font(.caption.weight(.bold))
-                    Text("enabled: \(appSettings.pipEnabled ? "on" : "off")  supported: \(pipManager.isSupported ? "yes" : "no")")
+                    Text("enabled: \(appSettings.pipEnabled ? "on" : "off")  supported: \(pipManager.isSupported ? "yes" : "no")  possible: \(pipManager.isPossible ? "yes" : "no")")
                         .font(.caption2)
-                    Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  phase: active")
+                    Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
                         .font(.caption2)
+                    Text("ready: \(pipManager.isReadyForDisplay ? "yes" : "no")  item: \(pipManager.itemStatusDescription)  time: \(pipManager.timeControlDescription)")
+                        .font(.caption2)
+                    if pipManager.lastStartAttemptSource != "none" {
+                        Text("attempt: \(pipManager.lastStartAttemptSource)")
+                            .font(.caption2)
+                    }
+                    if pipManager.lastFailureReason != "none" {
+                        Text("last: \(pipManager.lastFailureReason)")
+                            .font(.caption2)
+                            .foregroundStyle(.yellow)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button("Start PiP") {
+                        pipManager.startIfPossible(source: "debug button")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Capsule())
                 }
                 .padding(10)
                 .background(Color.black.opacity(0.78))
@@ -55,7 +75,7 @@ struct RootView: View {
 #endif
         }
         .overlay(alignment: .bottomTrailing) {
-            if shouldShowPiPPreview {
+            if shouldKeepPiPHostAttached {
                 ZStack(alignment: .bottomLeading) {
                     PiPPlayerHostView()
                         .background(
@@ -127,10 +147,19 @@ struct RootView: View {
         appSettings.pipEnabled && scenePhase == .active
 #endif
     }
+
+    private var shouldKeepPiPHostAttached: Bool {
+#if DEBUG
+        scenePhase == .active || appSettings.pipEnabled || pipManager.isActive
+#else
+        appSettings.pipEnabled || pipManager.isActive
+#endif
+    }
     
     /// Configure and start the background audio engine when entering the main flow.
     private func startAudioEngine() {
         AudioSessionManager.shared.configureSession()
+        SilentAudioPlayer.shared.start()
         PiPManager.shared.prepareIfNeeded()
     }
 
