@@ -360,60 +360,200 @@ final class PiPManager: NSObject, ObservableObject {
         let height = 180
         let fps: Int32 = 30
         let durationSeconds = 1
-        let frameCount = fps * Int32(durationSeconds)
+        let tempVideoURL = url.deletingLastPathComponent().appendingPathComponent("pip_placeholder_video.mp4")
+        let tempAudioURL = url.deletingLastPathComponent().appendingPathComponent("pip_placeholder_audio.caf")
 
         do {
-            let writer = try AVAssetWriter(url: url, fileType: .mp4)
-            let settings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: width,
-                AVVideoHeightKey: height
-            ]
+            try FileManager.default.removeItem(at: tempVideoURL)
+        } catch {
+            // Ignore if file didn't exist
+        }
 
-            let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
-            input.expectsMediaDataInRealTime = false
+        do {
+            try FileManager.default.removeItem(at: tempAudioURL)
+        } catch {
+            // Ignore if file didn't exist
+        }
 
-            let attributes: [String: Any] = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
-                kCVPixelBufferWidthKey as String: width,
-                kCVPixelBufferHeightKey as String: height
-            ]
-
-            let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-                assetWriterInput: input,
-                sourcePixelBufferAttributes: attributes
+        do {
+            try await writePlaceholderVideoOnly(
+                to: tempVideoURL,
+                width: width,
+                height: height,
+                fps: fps,
+                durationSeconds: durationSeconds,
+                snapshot: statusSnapshot
             )
-
-            guard writer.canAdd(input) else {
-                logger.error("Unable to add input to AVAssetWriter.")
-                return
-            }
-            writer.add(input)
-
-            writer.startWriting()
-            writer.startSession(atSourceTime: .zero)
-
-            let snapshot = statusSnapshot
-
-            for frame in 0..<frameCount {
-                while !input.isReadyForMoreMediaData {
-                    try await Task.sleep(nanoseconds: 5_000_000)
-                }
-
-                guard let buffer = makePixelBuffer(width: width, height: height, snapshot: snapshot) else { continue }
-                let time = CMTime(value: CMTimeValue(frame), timescale: fps)
-                adaptor.append(buffer, withPresentationTime: time)
-            }
-
-            input.markAsFinished()
-
-            await withCheckedContinuation { continuation in
-                writer.finishWriting {
-                    continuation.resume()
-                }
-            }
+            try writeSilentAudioTrack(to: tempAudioURL, durationSeconds: Double(durationSeconds))
+            try await mergePlaceholderMedia(videoURL: tempVideoURL, audioURL: tempAudioURL, outputURL: url)
         } catch {
             logger.error("Failed to generate PiP placeholder: \(error.localizedDescription)")
+        }
+
+        try? FileManager.default.removeItem(at: tempVideoURL)
+        try? FileManager.default.removeItem(at: tempAudioURL)
+    }
+
+    private func writePlaceholderVideoOnly(
+        to url: URL,
+        width: Int,
+        height: Int,
+        fps: Int32,
+        durationSeconds: Int,
+        snapshot: PiPStatusSnapshot
+    ) async throws {
+        let frameCount = fps * Int32(durationSeconds)
+        let writer = try AVAssetWriter(url: url, fileType: .mp4)
+        let settings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
+        ]
+
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+        input.expectsMediaDataInRealTime = false
+
+        let attributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+            kCVPixelBufferWidthKey as String: width,
+            kCVPixelBufferHeightKey as String: height
+        ]
+
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: attributes
+        )
+
+        guard writer.canAdd(input) else {
+            throw NSError(domain: "PiPPlaceholder", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Unable to add video input to AVAssetWriter."
+            ])
+        }
+        writer.add(input)
+
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+
+        for frame in 0..<frameCount {
+            while !input.isReadyForMoreMediaData {
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+
+            guard let buffer = makePixelBuffer(width: width, height: height, snapshot: snapshot) else { continue }
+            let time = CMTime(value: CMTimeValue(frame), timescale: fps)
+            adaptor.append(buffer, withPresentationTime: time)
+        }
+
+        input.markAsFinished()
+
+        await withCheckedContinuation { continuation in
+            writer.finishWriting {
+                continuation.resume()
+            }
+        }
+
+        if writer.status != .completed {
+            throw writer.error ?? NSError(domain: "PiPPlaceholder", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Video writer failed to finish."
+            ])
+        }
+    }
+
+    private func writeSilentAudioTrack(to url: URL, durationSeconds: Double) throws {
+        let sampleRate = 44_100.0
+        let channelCount: AVAudioChannelCount = 1
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: sampleRate,
+            channels: channelCount,
+            interleaved: false
+        ) else {
+            throw NSError(domain: "PiPPlaceholder", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "Unable to create audio format."
+            ])
+        }
+
+        let frameCount = AVAudioFrameCount(sampleRate * durationSeconds)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+            throw NSError(domain: "PiPPlaceholder", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "Unable to create silent audio buffer."
+            ])
+        }
+
+        buffer.frameLength = frameCount
+        if let channelData = buffer.floatChannelData {
+            for channel in 0..<Int(channelCount) {
+                memset(channelData[channel], 0, Int(frameCount) * MemoryLayout<Float>.size)
+            }
+        }
+
+        let audioFile = try AVAudioFile(
+            forWriting: url,
+            settings: format.settings,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        try audioFile.write(from: buffer)
+    }
+
+    private func mergePlaceholderMedia(videoURL: URL, audioURL: URL, outputURL: URL) async throws {
+        let composition = AVMutableComposition()
+        let videoAsset = AVURLAsset(url: videoURL)
+        let audioAsset = AVURLAsset(url: audioURL)
+
+        let duration = try await videoAsset.load(.duration)
+        guard let sourceVideoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
+              let compositionVideoTrack = composition.addMutableTrack(
+                withMediaType: .video,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+              ) else {
+            throw NSError(domain: "PiPPlaceholder", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: "Unable to load placeholder video track."
+            ])
+        }
+
+        try compositionVideoTrack.insertTimeRange(
+            CMTimeRange(start: .zero, duration: duration),
+            of: sourceVideoTrack,
+            at: .zero
+        )
+        compositionVideoTrack.preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+
+        if let sourceAudioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first,
+           let compositionAudioTrack = composition.addMutableTrack(
+            withMediaType: .audio,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+           ) {
+            try compositionAudioTrack.insertTimeRange(
+                CMTimeRange(start: .zero, duration: duration),
+                of: sourceAudioTrack,
+                at: .zero
+            )
+        }
+
+        guard let exportSession = AVAssetExportSession(
+            asset: composition,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
+            throw NSError(domain: "PiPPlaceholder", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: "Unable to create export session for placeholder asset."
+            ])
+        }
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = false
+
+        await withCheckedContinuation { continuation in
+            exportSession.exportAsynchronously {
+                continuation.resume()
+            }
+        }
+
+        if exportSession.status != .completed {
+            throw exportSession.error ?? NSError(domain: "PiPPlaceholder", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "Merged placeholder export failed."
+            ])
         }
     }
 
