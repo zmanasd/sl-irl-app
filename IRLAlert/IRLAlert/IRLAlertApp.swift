@@ -74,26 +74,22 @@ struct RootView: View {
                         .font(.caption2)
                     Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  vc: \(pipManager.hasAttachedPlayerViewController ? "yes" : "no")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  ctrl: \(pipManager.hasPiPController ? "yes" : "no")  stable: \(pipManager.isBoundLayerStable ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
                         .font(.caption2)
+                    Text("hier: \(pipManager.isBoundLayerInHierarchy ? "yes" : "no")  size: \(pipManager.isBoundLayerSized ? "yes" : "no")  hostWin: \(pipManager.isHostViewInWindow ? "yes" : "no")")
+                        .font(.caption2)
                     Text("mode: \(pipManager.playbackModeDebugLabel)")
                         .font(.caption2)
                     Text("ready: \(pipManager.isReadyForDisplay ? "yes" : "no")  item: \(pipManager.itemStatusDescription)  time: \(pipManager.timeControlDescription)")
                         .font(.caption2)
-                    if pipManager.lastStartAttemptSource != "none" {
-                        Text("attempt: \(pipManager.lastStartAttemptSource)")
-                            .font(.caption2)
-                    }
-                    if pipManager.pendingDeferredStartSource != "none" {
-                        Text("pending: \(pipManager.pendingDeferredStartSource)")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if pipManager.lastFailureReason != "none" {
-                        Text("last: \(pipManager.lastFailureReason)")
-                            .font(.caption2)
-                            .foregroundStyle(.yellow)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text("attempt: \(pipManager.lastStartAttemptSource)")
+                        .font(.caption2)
+                    Text("pending: \(pipManager.pendingDeferredStartSource)")
+                        .font(.caption2)
+                        .foregroundStyle(pipManager.pendingDeferredStartSource == "none" ? .white : .orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("last: \(pipManager.lastFailureReason)")
+                        .font(.caption2)
+                        .foregroundStyle(pipManager.lastFailureReason == "none" ? .white : .yellow)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button("Force Start PiP") {
                         pipManager.startIfPossible(source: "debug button", force: true)
                     }
@@ -155,7 +151,7 @@ struct RootView: View {
             if appSettings.hasCompletedOnboarding {
                 router.currentFlow = .main
             }
-            if appSettings.pipEnabled {
+            if appSettings.pipEnabled || pipManager.isBaselineRealMediaMode {
                 startAudioEngine()
                 PiPManager.shared.ensurePreviewPlayback()
             }
@@ -171,7 +167,9 @@ struct RootView: View {
                 startAudioEngine()
                 PiPManager.shared.ensurePreviewPlayback()
             } else {
-                PiPManager.shared.stopIfActive()
+                if !pipManager.isBaselineRealMediaMode {
+                    PiPManager.shared.stopIfActive()
+                }
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -208,10 +206,13 @@ struct RootView: View {
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
         switch newPhase {
         case .inactive:
-            if appSettings.pipEnabled {
-                PiPManager.shared.startIfPossible()
+            if appSettings.pipEnabled || pipManager.isBaselineRealMediaMode {
+                PiPManager.shared.startIfPossible(source: "inactive")
             }
         case .background:
+            if appSettings.pipEnabled || pipManager.isBaselineRealMediaMode {
+                PiPManager.shared.startIfPossible(source: "background")
+            }
             if appSettings.pipEnabled {
                 Task { await RelayClient.shared.updatePresence(directConnectionActive: true) }
             } else {

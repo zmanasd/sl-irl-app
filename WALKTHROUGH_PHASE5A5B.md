@@ -161,6 +161,22 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
   - do not rebind/recreate the PiP controller when later layer instances appear
 - Added stability gating for initial controller binding so PiP controller creation is deferred until the hosted layer is attached in-window with non-zero bounds.
 
+### 21) Step 1/2 follow-up diagnostics and startup hardening
+- Relaxed PiP layer stability gating to require only:
+  - layer attached in hierarchy
+  - non-zero layer bounds
+- Added granular stability diagnostics in `PiPManager` debug state:
+  - `hier` (bound layer has superlayer)
+  - `size` (bound layer bounds are non-zero)
+  - `hostWin` (host view attached to a `UIWindow`)
+- Expanded `PiP not possible yet` failure text with these sub-signals.
+- Updated baseline host/controller defaults to be AVKit-friendly:
+  - enable playback controls in baseline mode
+  - enable now-playing updates in baseline mode
+  - keep placeholder-only settings (`requiresLinearPlayback = false`, fill gravity) on placeholder path.
+- Updated debug overlay to always show `attempt`, `pending`, and `last` lines (including `none`) to avoid hidden-state ambiguity during testing.
+- Added scene-phase fallback start on `.background` (in addition to `.inactive`) so non-deterministic transition timing still triggers a PiP start attempt in baseline diagnostics mode.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift

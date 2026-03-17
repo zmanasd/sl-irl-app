@@ -17,6 +17,9 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var hasAttachedPlayerViewController: Bool = false
     @Published private(set) var hasPiPController: Bool = false
     @Published private(set) var isBoundLayerStable: Bool = false
+    @Published private(set) var isBoundLayerInHierarchy: Bool = false
+    @Published private(set) var isBoundLayerSized: Bool = false
+    @Published private(set) var isHostViewInWindow: Bool = false
     @Published private(set) var isReadyForDisplay: Bool = false
     @Published private(set) var itemStatusDescription: String = "unknown"
     @Published private(set) var timeControlDescription: String = "idle"
@@ -130,7 +133,9 @@ final class PiPManager: NSObject, ObservableObject {
         guard force || pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
             queueDeferredStart(source: source)
-            lastFailureReason = "PiP not possible yet"
+            let stability = layerStabilityComponents(pipController.playerLayer)
+            let hostInWindow = playerViewController?.view.window != nil
+            lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)))"
             scheduleStartRetry(source: source)
             return
         }
@@ -263,7 +268,7 @@ final class PiPManager: NSObject, ObservableObject {
     private func ensurePiPControllerBoundToInitialLayer(_ layer: AVPlayerLayer) {
         if pipController == nil {
             guard isLayerStableForPiP(layer) else {
-                logger.debug("Deferring PiP controller creation until player layer is stable in window.")
+                logger.debug("Deferring PiP controller creation until player layer is stable.")
                 return
             }
             pipController = makePiPController(for: layer)
@@ -280,11 +285,15 @@ final class PiPManager: NSObject, ObservableObject {
         logger.notice("Ignoring player-layer rebind to preserve single PiP controller lifetime.")
     }
 
-    private func isLayerStableForPiP(_ layer: AVPlayerLayer) -> Bool {
+    private func layerStabilityComponents(_ layer: AVPlayerLayer) -> (inHierarchy: Bool, hasSize: Bool) {
         let inHierarchy = layer.superlayer != nil
         let hasSize = !layer.bounds.isEmpty
-        let hostHasWindow = playerViewController?.view.window != nil || playerViewController == nil
-        return inHierarchy && hasSize && hostHasWindow
+        return (inHierarchy, hasSize)
+    }
+
+    private func isLayerStableForPiP(_ layer: AVPlayerLayer) -> Bool {
+        let components = layerStabilityComponents(layer)
+        return components.inHierarchy && components.hasSize
     }
 
     private func queueDeferredStart(source: String) {
@@ -310,11 +319,18 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func configurePlayerViewController(_ controller: AVPlayerViewController) {
         controller.player = player
-        controller.showsPlaybackControls = false
         controller.allowsPictureInPicturePlayback = true
         controller.canStartPictureInPictureAutomaticallyFromInline = true
-        controller.updatesNowPlayingInfoCenter = false
-        controller.videoGravity = .resizeAspectFill
+        switch playbackMode {
+        case .baselineRealMedia:
+            controller.showsPlaybackControls = true
+            controller.updatesNowPlayingInfoCenter = true
+            controller.videoGravity = .resizeAspect
+        case .statusPlaceholder:
+            controller.showsPlaybackControls = false
+            controller.updatesNowPlayingInfoCenter = false
+            controller.videoGravity = .resizeAspectFill
+        }
     }
 
     private func bindPlayerLayerFromHostedControllerIfNeeded() {
@@ -359,7 +375,9 @@ final class PiPManager: NSObject, ObservableObject {
 
         controller.delegate = self
         controller.canStartPictureInPictureAutomaticallyFromInline = true
-        controller.requiresLinearPlayback = false
+        if playbackMode == .statusPlaceholder {
+            controller.requiresLinearPlayback = false
+        }
         pipPossibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observedController, _ in
             let isPossible = observedController.isPictureInPicturePossible
             Task { @MainActor in
@@ -808,12 +826,18 @@ final class PiPManager: NSObject, ObservableObject {
     private func refreshDebugState() {
         isSupported = AVPictureInPictureController.isPictureInPictureSupported()
         hasAttachedPlayerViewController = playerViewController != nil
+        isHostViewInWindow = playerViewController?.view.window != nil
         hasPiPController = pipController != nil
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
         if let boundLayer = pipController?.playerLayer {
-            isBoundLayerStable = isLayerStableForPiP(boundLayer)
+            let stability = layerStabilityComponents(boundLayer)
+            isBoundLayerInHierarchy = stability.inHierarchy
+            isBoundLayerSized = stability.hasSize
+            isBoundLayerStable = stability.inHierarchy && stability.hasSize
         } else {
+            isBoundLayerInHierarchy = false
+            isBoundLayerSized = false
             isBoundLayerStable = false
         }
         isPossible = pipController?.isPictureInPicturePossible ?? false
@@ -846,6 +870,10 @@ final class PiPManager: NSObject, ObservableObject {
         } else {
             timeControlDescription = "missing"
         }
+    }
+
+    private func yesNo(_ value: Bool) -> String {
+        value ? "yes" : "no"
     }
 }
 

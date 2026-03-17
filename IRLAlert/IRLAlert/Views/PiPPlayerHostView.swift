@@ -27,11 +27,6 @@ struct PiPPlayerHostView: UIViewControllerRepresentable {
 
         private func configureForHostUsage() {
             view.backgroundColor = .clear
-            showsPlaybackControls = false
-            allowsPictureInPicturePlayback = true
-            canStartPictureInPictureAutomaticallyFromInline = true
-            updatesNowPlayingInfoCenter = false
-            videoGravity = .resizeAspectFill
             view.isUserInteractionEnabled = false
         }
     }
