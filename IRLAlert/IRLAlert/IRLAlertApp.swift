@@ -53,7 +53,6 @@ struct RootView: View {
                     VStack(spacing: 0) {
                         PiPPlayerLayerHostView()
                             .frame(width: inlineWidth, height: inlineHeight)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay(alignment: .bottomLeading) {
                                 Text("Baseline PiP Inline Media (16:9)")
                                     .font(.caption2.weight(.semibold))
@@ -61,13 +60,8 @@ struct RootView: View {
                                     .padding(.vertical, 6)
                                     .background(.black.opacity(0.65))
                                     .foregroundStyle(.white)
-                                    .clipShape(Capsule())
                                     .padding(.leading, 12)
                                     .padding(.bottom, 12)
-                            }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(.white.opacity(0.22), lineWidth: 1)
                             }
                         Spacer(minLength: 0)
                     }
@@ -76,7 +70,6 @@ struct RootView: View {
                     .padding(.horizontal, 12)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
-                    .clipped()
                 }
                 .ignoresSafeArea(edges: .top)
             }

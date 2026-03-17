@@ -54,6 +54,7 @@ final class PiPManager: NSObject, ObservableObject {
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var playerLayer: AVPlayerLayer?
+    private weak var pipBoundSourceLayer: AVPlayerLayer?
     private weak var playerViewController: AVPlayerViewController?
     private var pipPossibleObservation: NSKeyValueObservation?
     private var playerLayerReadyObservation: NSKeyValueObservation?
@@ -138,9 +139,10 @@ final class PiPManager: NSObject, ObservableObject {
         guard force || pipController.isPictureInPicturePossible else {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
             queueDeferredStart(source: source)
-            let stability = layerStabilityComponents(pipController.playerLayer)
+            let diagnosticLayer = pipBoundSourceLayer ?? playerLayer
+            let stability = diagnosticLayer.map { layerStabilityComponents($0) } ?? (inHierarchy: false, hasSize: false)
             let hostInWindow = hasHostWindowLikeAttachment()
-            let aspect = aspectDescription(for: pipController.playerLayer.bounds)
+            let aspect = diagnosticLayer.map { aspectDescription(for: $0.bounds) } ?? "missing"
             lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
             scheduleStartRetry(source: source)
             return
@@ -284,13 +286,15 @@ final class PiPManager: NSObject, ObservableObject {
                 return
             }
             pipController = makePiPController(for: layer)
+            pipBoundSourceLayer = layer
             return
         }
 
-        guard let existingLayer = pipController?.playerLayer, existingLayer !== layer else { return }
+        guard let existingLayer = pipBoundSourceLayer, existingLayer !== layer else { return }
         if !isLayerStableForPiP(existingLayer), isLayerStableForPiP(layer), !isActive {
             logger.notice("Rebinding PiP controller once from unstable initial layer to stable layer.")
             pipController = makePiPController(for: layer)
+            pipBoundSourceLayer = layer
             return
         }
 
@@ -850,7 +854,7 @@ final class PiPManager: NSObject, ObservableObject {
         hasPiPController = pipController != nil
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
-        if let boundLayer = pipController?.playerLayer {
+        if let boundLayer = pipBoundSourceLayer ?? playerLayer {
             let stability = layerStabilityComponents(boundLayer)
             isBoundLayerInHierarchy = stability.inHierarchy
             isBoundLayerSized = stability.hasSize

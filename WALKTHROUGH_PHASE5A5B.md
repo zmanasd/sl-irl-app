@@ -202,6 +202,11 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
   - no mix/duck options
   to remove audio-session policy as an eligibility variable during baseline diagnostics.
 
+### 25) ContentSource diagnostics correction
+- Updated layer-stability/aspect diagnostics to use the explicitly bound source layer reference, not `pipController.playerLayer`.
+- This avoids false `hier:no / size:no / aspect:missing` debug reports after switching to `ContentSource`.
+- Removed baseline host clipping/masking chrome so the inline `AVPlayerLayer` remains an unmasked rectangular video surface during eligibility checks.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
