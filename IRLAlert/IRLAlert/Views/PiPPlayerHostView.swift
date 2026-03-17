@@ -60,7 +60,7 @@ struct PiPPlayerHostView: UIViewControllerRepresentable {
 
         private func configureForHostUsage() {
             view.backgroundColor = .clear
-            view.isUserInteractionEnabled = false
+            view.isUserInteractionEnabled = true
         }
     }
 }

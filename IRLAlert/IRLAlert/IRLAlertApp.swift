@@ -51,7 +51,7 @@ struct RootView: View {
                     let inlineHeight = inlineWidth * (9.0 / 16.0)
 
                     VStack(spacing: 0) {
-                        PiPPlayerLayerHostView()
+                        PiPPlayerHostView()
                             .frame(width: inlineWidth, height: inlineHeight)
                             .overlay(alignment: .bottomLeading) {
                                 Text("Baseline PiP Inline Media (16:9)")
@@ -68,8 +68,6 @@ struct RootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.top, 14)
                     .padding(.horizontal, 12)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
                 }
                 .ignoresSafeArea(edges: .top)
             }

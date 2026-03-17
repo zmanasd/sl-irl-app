@@ -207,6 +207,10 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - This avoids false `hier:no / size:no / aspect:missing` debug reports after switching to `ContentSource`.
 - Removed baseline host clipping/masking chrome so the inline `AVPlayerLayer` remains an unmasked rectangular video surface during eligibility checks.
 
+### 26) AVKit-host eligibility A/B fallback
+- Switched baseline inline host back to `AVPlayerViewController` (still 16:9) to probe whether iOS 26 PiP eligibility requires an AVKit-managed playback surface.
+- Re-enabled host view interaction for baseline host path during diagnostics to avoid potential eligibility rejection on non-interactive playback surfaces.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
