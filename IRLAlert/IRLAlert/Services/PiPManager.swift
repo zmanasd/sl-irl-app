@@ -31,6 +31,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var pipControllerBindingDescription: String = "none"
     @Published private(set) var itemHasVideoTrackDescription: String = "unknown"
     @Published private(set) var itemPresentationDescription: String = "missing"
+    @Published private(set) var audioSessionStateDescription: String = "unknown"
 
     private enum PlaybackMode {
         case baselineRealMedia
@@ -63,6 +64,7 @@ final class PiPManager: NSObject, ObservableObject {
     private weak var playerViewController: AVPlayerViewController?
     private var pipPossibleObservation: NSKeyValueObservation?
     private var playerLayerReadyObservation: NSKeyValueObservation?
+    private var playerLayerBoundsObservation: NSKeyValueObservation?
     private var playerTimeControlObservation: NSKeyValueObservation?
     private var playerItemStatusObservation: NSKeyValueObservation?
     private var didPrepare = false
@@ -71,6 +73,7 @@ final class PiPManager: NSObject, ObservableObject {
     private let maxStartRetryCount = 3
     private var refreshTask: Task<Void, Never>?
     private var deferredStartSource: String?
+    private var wantsStartWhenPossible = false
 
     private struct PiPStatusSnapshot {
         var lastAlert: String
@@ -129,33 +132,30 @@ final class PiPManager: NSObject, ObservableObject {
 
     func startIfPossible(source: String = "app", force: Bool = false) {
         lastStartAttemptSource = source
+        if playbackMode == .baselineRealMedia {
+            AudioSessionManager.shared.configureSessionForPiPBaseline()
+        } else {
+            AudioSessionManager.shared.configureSession()
+        }
         prepareIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
+        queueDeferredStart(source: source)
         refreshDebugState()
         guard let pipController else {
-            queueDeferredStart(source: source)
             lastFailureReason = "No PiP controller available"
-            if !force {
-                scheduleStartRetry(source: source)
-            }
+            scheduleStartRetry(source: source)
             return
         }
         player?.play()
-        guard force || pipController.isPictureInPicturePossible else {
-            logger.warning("PiP not possible. Ensure a valid video source is active.")
-            queueDeferredStart(source: source)
+        attemptDeferredStartIfPossible(trigger: force ? "force request" : "start request")
+        if !pipController.isPictureInPicturePossible {
+            logger.warning("PiP pending. Waiting for async eligibility.")
             let diagnosticLayer = pipBoundSourceLayer ?? playerLayer
             let stability = diagnosticLayer.map { layerStabilityComponents($0) } ?? (inHierarchy: false, hasSize: false)
             let hostInWindow = hasHostWindowLikeAttachment()
             let aspect = diagnosticLayer.map { aspectDescription(for: $0.bounds) } ?? "missing"
-            lastFailureReason = "PiP not possible yet (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
-            scheduleStartRetry(source: source)
-            return
+            lastFailureReason = "PiP pending eligibility (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
         }
-        startRetryCount = 0
-        clearDeferredStart()
-        lastFailureReason = "none"
-        pipController.startPictureInPicture()
     }
 
     func stopIfActive() {
@@ -332,16 +332,19 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func queueDeferredStart(source: String) {
         deferredStartSource = source
+        wantsStartWhenPossible = true
         pendingDeferredStartSource = source
     }
 
     private func clearDeferredStart() {
         deferredStartSource = nil
+        wantsStartWhenPossible = false
         pendingDeferredStartSource = "none"
     }
 
     private func attemptDeferredStartIfPossible(trigger: String) {
         guard let pipController, let queuedSource = deferredStartSource else { return }
+        guard wantsStartWhenPossible else { return }
         guard pipController.isPictureInPicturePossible else { return }
 
         clearDeferredStart()
@@ -458,6 +461,9 @@ final class PiPManager: NSObject, ObservableObject {
 
             Task { @MainActor in
                 self?.timeControlDescription = description
+                if observedPlayer.timeControlStatus == .playing {
+                    self?.attemptDeferredStartIfPossible(trigger: "timeControl=playing")
+                }
             }
         }
     }
@@ -467,8 +473,28 @@ final class PiPManager: NSObject, ObservableObject {
             let ready = observedLayer.isReadyForDisplay
             Task { @MainActor in
                 self?.isReadyForDisplay = ready
+                if ready {
+                    self?.reevaluateLayerState(trigger: "readyForDisplay", shouldAttemptStart: true)
+                } else {
+                    self?.refreshDebugState()
+                }
             }
         }
+        playerLayerBoundsObservation = layer.observe(\.bounds, options: [.initial, .new]) { [weak self] _, _ in
+            Task { @MainActor in
+                self?.reevaluateLayerState(trigger: "layer bounds updated", shouldAttemptStart: true)
+            }
+        }
+    }
+
+    private func reevaluateLayerState(trigger: String, shouldAttemptStart: Bool) {
+        if let activeLayer = playerLayer ?? pipBoundSourceLayer {
+            ensurePiPControllerBoundToInitialLayer(activeLayer)
+        }
+        if shouldAttemptStart {
+            attemptDeferredStartIfPossible(trigger: trigger)
+        }
+        refreshDebugState()
     }
 
     @objc private func loopPlayerItem() {
@@ -937,6 +963,10 @@ final class PiPManager: NSObject, ObservableObject {
         } else {
             timeControlDescription = "missing"
         }
+
+        let audioSession = AVAudioSession.sharedInstance()
+        let audioActive = AudioSessionManager.shared.isSessionActive
+        audioSessionStateDescription = "cat:\(audioSession.category.rawValue) mode:\(audioSession.mode.rawValue) active:\(yesNo(audioActive))"
     }
 
     private func yesNo(_ value: Bool) -> String {
