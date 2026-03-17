@@ -91,6 +91,8 @@ struct RootView: View {
                         .font(.caption2)
                     Text("ready: \(pipManager.isReadyForDisplay ? "yes" : "no")  item: \(pipManager.itemStatusDescription)  time: \(pipManager.timeControlDescription)")
                         .font(.caption2)
+                    Text("video: \(pipManager.itemHasVideoTrackDescription)  pres: \(pipManager.itemPresentationDescription)")
+                        .font(.caption2)
                     Text("attempt: \(pipManager.lastStartAttemptSource)")
                         .font(.caption2)
                     Text("pending: \(pipManager.pendingDeferredStartSource)")

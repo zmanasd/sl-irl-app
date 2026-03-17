@@ -29,6 +29,8 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var pendingDeferredStartSource: String = "none"
     @Published private(set) var baselineSourceDescription: String = "unknown"
     @Published private(set) var pipControllerBindingDescription: String = "none"
+    @Published private(set) var itemHasVideoTrackDescription: String = "unknown"
+    @Published private(set) var itemPresentationDescription: String = "missing"
 
     private enum PlaybackMode {
         case baselineRealMedia
@@ -275,6 +277,12 @@ final class PiPManager: NSObject, ObservableObject {
                 baselineSourceDescription = "bundle-mp4"
                 return AVPlayerItem(url: bundledClip)
             }
+            if let generatedClip = placeholderFileURL(), FileManager.default.fileExists(atPath: generatedClip.path) {
+                baselineSourceDescription = "generated-local"
+                return AVPlayerItem(url: generatedClip)
+            }
+            // Generate a local fallback clip opportunistically, then continue with remote URLs.
+            _ = placeholderVideoURL()
             if let baselineProgressiveMediaURL {
                 baselineSourceDescription = "remote-mp4"
                 return AVPlayerItem(url: baselineProgressiveMediaURL)
@@ -901,8 +909,18 @@ final class PiPManager: NSObject, ObservableObject {
             @unknown default:
                 itemStatusDescription = "unknown"
             }
+            let hasVideoTrack = item.tracks.contains { $0.assetTrack?.mediaType == .video }
+            itemHasVideoTrackDescription = hasVideoTrack ? "yes" : "no"
+            let presentationSize = item.presentationSize
+            if presentationSize.width > 0, presentationSize.height > 0 {
+                itemPresentationDescription = "\(Int(presentationSize.width.rounded()))x\(Int(presentationSize.height.rounded()))"
+            } else {
+                itemPresentationDescription = "missing"
+            }
         } else {
             itemStatusDescription = "missing"
+            itemHasVideoTrackDescription = "missing"
+            itemPresentationDescription = "missing"
         }
 
         if let player {
