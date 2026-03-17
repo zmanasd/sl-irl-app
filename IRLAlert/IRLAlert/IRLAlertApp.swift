@@ -81,7 +81,7 @@ struct RootView: View {
                         .font(.caption.weight(.bold))
                     Text("enabled: \(appSettings.pipEnabled ? "on" : "off")  supported: \(pipManager.isSupported ? "yes" : "no")  possible: \(pipManager.isPossible ? "yes" : "no")")
                         .font(.caption2)
-                    Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  vc: \(pipManager.hasAttachedPlayerViewController ? "yes" : "no")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  ctrl: \(pipManager.hasPiPController ? "yes" : "no")  stable: \(pipManager.isBoundLayerStable ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
+                    Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  vc: \(pipManager.hasAttachedPlayerViewController ? "yes" : "no")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  ctrl: \(pipManager.hasPiPController ? "yes" : "no")(\(pipManager.pipControllerBindingDescription))  stable: \(pipManager.isBoundLayerStable ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
                         .font(.caption2)
                     Text("hier: \(pipManager.isBoundLayerInHierarchy ? "yes" : "no")  size: \(pipManager.isBoundLayerSized ? "yes" : "no")  hostWin: \(pipManager.isHostViewInWindow ? "yes" : "no")")
                         .font(.caption2)

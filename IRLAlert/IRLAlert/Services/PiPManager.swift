@@ -28,6 +28,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var lastStartAttemptSource: String = "none"
     @Published private(set) var pendingDeferredStartSource: String = "none"
     @Published private(set) var baselineSourceDescription: String = "unknown"
+    @Published private(set) var pipControllerBindingDescription: String = "none"
 
     private enum PlaybackMode {
         case baselineRealMedia
@@ -145,7 +146,7 @@ final class PiPManager: NSObject, ObservableObject {
             let stability = diagnosticLayer.map { layerStabilityComponents($0) } ?? (inHierarchy: false, hasSize: false)
             let hostInWindow = hasHostWindowLikeAttachment()
             let aspect = diagnosticLayer.map { aspectDescription(for: $0.bounds) } ?? "missing"
-            lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
+            lastFailureReason = "PiP not possible yet (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
             scheduleStartRetry(source: source)
             return
         }
@@ -394,15 +395,25 @@ final class PiPManager: NSObject, ObservableObject {
     private func makePiPController(for playerLayer: AVPlayerLayer) -> AVPictureInPictureController? {
         let controller: AVPictureInPictureController?
         if #available(iOS 15.0, *) {
-            let contentSource = AVPictureInPictureController.ContentSource(playerLayer: playerLayer)
-            controller = AVPictureInPictureController(contentSource: contentSource)
+            if playbackMode == .baselineRealMedia {
+                // Keep baseline tests on the legacy AVPlayerLayer binding path to avoid
+                // ContentSource-specific eligibility edge cases on newer iOS builds.
+                controller = AVPictureInPictureController(playerLayer: playerLayer)
+                pipControllerBindingDescription = "legacy-player-layer"
+            } else {
+                let contentSource = AVPictureInPictureController.ContentSource(playerLayer: playerLayer)
+                controller = AVPictureInPictureController(contentSource: contentSource)
+                pipControllerBindingDescription = "content-source"
+            }
         } else {
             controller = AVPictureInPictureController(playerLayer: playerLayer)
+            pipControllerBindingDescription = "legacy-player-layer"
         }
 
         guard let controller else {
             logger.error("Failed to create PiP controller for player layer.")
             lastFailureReason = "Failed to create PiP controller"
+            pipControllerBindingDescription = "none"
             return nil
         }
 
@@ -861,6 +872,9 @@ final class PiPManager: NSObject, ObservableObject {
         hasAttachedPlayerViewController = playerViewController != nil
         isHostViewInWindow = hasHostWindowLikeAttachment()
         hasPiPController = pipController != nil
+        if pipController == nil {
+            pipControllerBindingDescription = "none"
+        }
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
         if let boundLayer = pipBoundSourceLayer ?? playerLayer {
