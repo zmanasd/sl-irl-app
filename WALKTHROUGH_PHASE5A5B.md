@@ -186,6 +186,13 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
   as `hostWin: yes`.
 - Cleared stale “host not ready” failure text once the layer host is attached and controller binding proceeds.
 
+### 23) Baseline host persistence and 16:9 eligibility probe
+- Kept the baseline debug host attached across scene transitions even when app-level PiP toggle is off, so background diagnostics stay valid in baseline mode.
+- Changed baseline inline host surface to a fixed 16:9 presentation to probe known wide-layer PiP eligibility issues.
+- Added bound-layer aspect-ratio diagnostics:
+  - `aspect` line in debug overlay
+  - `aspect` included in `PiP not possible yet (...)` failure string.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift

@@ -20,6 +20,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var isBoundLayerInHierarchy: Bool = false
     @Published private(set) var isBoundLayerSized: Bool = false
     @Published private(set) var isHostViewInWindow: Bool = false
+    @Published private(set) var boundLayerAspectDescription: String = "missing"
     @Published private(set) var isReadyForDisplay: Bool = false
     @Published private(set) var itemStatusDescription: String = "unknown"
     @Published private(set) var timeControlDescription: String = "idle"
@@ -135,7 +136,8 @@ final class PiPManager: NSObject, ObservableObject {
             queueDeferredStart(source: source)
             let stability = layerStabilityComponents(pipController.playerLayer)
             let hostInWindow = hasHostWindowLikeAttachment()
-            lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)))"
+            let aspect = aspectDescription(for: pipController.playerLayer.bounds)
+            lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
             scheduleStartRetry(source: source)
             return
         }
@@ -167,6 +169,9 @@ final class PiPManager: NSObject, ObservableObject {
         observePlayerLayer(layer)
         setupPlayerLayerIfNeeded()
         ensurePiPControllerBoundToInitialLayer(layer)
+        if lastFailureReason == "PiP host not attached yet" || lastFailureReason == "PiP player layer missing (host not ready)" {
+            lastFailureReason = "none"
+        }
         refreshDebugState()
         attemptDeferredStartIfPossible(trigger: "player layer attached")
         didPrepare = true
@@ -838,10 +843,12 @@ final class PiPManager: NSObject, ObservableObject {
             isBoundLayerInHierarchy = stability.inHierarchy
             isBoundLayerSized = stability.hasSize
             isBoundLayerStable = stability.inHierarchy && stability.hasSize
+            boundLayerAspectDescription = aspectDescription(for: boundLayer.bounds)
         } else {
             isBoundLayerInHierarchy = false
             isBoundLayerSized = false
             isBoundLayerStable = false
+            boundLayerAspectDescription = "missing"
         }
         isPossible = pipController?.isPictureInPicturePossible ?? false
         if let item = player?.currentItem {
@@ -884,6 +891,12 @@ final class PiPManager: NSObject, ObservableObject {
             return playerViewController.view.window != nil
         }
         return playerLayer?.superlayer != nil
+    }
+
+    private func aspectDescription(for bounds: CGRect) -> String {
+        guard bounds.height > 0 else { return "missing" }
+        let ratio = bounds.width / bounds.height
+        return String(format: "%.2f", ratio)
     }
 }
 

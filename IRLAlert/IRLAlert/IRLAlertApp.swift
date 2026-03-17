@@ -45,22 +45,33 @@ struct RootView: View {
         }
         .overlay {
             if shouldKeepPiPHostAttached && pipManager.isBaselineRealMediaMode {
-                // Step 1 baseline path: keep a real inline player visibly filling the window.
-                PiPPlayerLayerHostView()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                    .overlay(alignment: .bottomLeading) {
-                        Text("Baseline PiP Inline Media")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.black.opacity(0.65))
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                            .padding(.leading, 16)
-                            .padding(.bottom, 24)
-                    }
+                // Keep a 16:9 inline host so we can rule out wide-layer PiP eligibility edge cases.
+                VStack(spacing: 0) {
+                    PiPPlayerLayerHostView()
+                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                        .frame(maxWidth: 320)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(alignment: .bottomLeading) {
+                            Text("Baseline PiP Inline Media (16:9)")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.black.opacity(0.65))
+                                .foregroundStyle(.white)
+                                .clipShape(Capsule())
+                                .padding(.leading, 12)
+                                .padding(.bottom, 12)
+                        }
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(.white.opacity(0.22), lineWidth: 1)
+                        }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 14)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: router.currentFlow)
@@ -75,6 +86,8 @@ struct RootView: View {
                     Text("flow: \(router.currentFlow == .main ? "main" : "onboarding")  vc: \(pipManager.hasAttachedPlayerViewController ? "yes" : "no")  layer: \(pipManager.hasAttachedPlayerLayer ? "yes" : "no")  ctrl: \(pipManager.hasPiPController ? "yes" : "no")  stable: \(pipManager.isBoundLayerStable ? "yes" : "no")  active: \(pipManager.isActive ? "yes" : "no")")
                         .font(.caption2)
                     Text("hier: \(pipManager.isBoundLayerInHierarchy ? "yes" : "no")  size: \(pipManager.isBoundLayerSized ? "yes" : "no")  hostWin: \(pipManager.isHostViewInWindow ? "yes" : "no")")
+                        .font(.caption2)
+                    Text("aspect: \(pipManager.boundLayerAspectDescription)")
                         .font(.caption2)
                     Text("mode: \(pipManager.playbackModeDebugLabel)")
                         .font(.caption2)
@@ -187,7 +200,7 @@ struct RootView: View {
 
     private var shouldKeepPiPHostAttached: Bool {
 #if DEBUG
-        scenePhase == .active || appSettings.pipEnabled || pipManager.isActive
+        scenePhase == .active || appSettings.pipEnabled || pipManager.isActive || pipManager.isBaselineRealMediaMode
 #else
         appSettings.pipEnabled || pipManager.isActive
 #endif
