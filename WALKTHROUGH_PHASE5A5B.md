@@ -193,6 +193,15 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
   - `aspect` line in debug overlay
   - `aspect` included in `PiP not possible yet (...)` failure string.
 
+### 24) PiP compatibility hardening follow-up
+- Updated baseline inline host layout to device-width 16:9 instead of capped-card sizing to match stricter historical PiP eligibility behavior.
+- Switched PiP controller creation to the newer `AVPictureInPictureController.ContentSource(playerLayer:)` path (with fallback) when available.
+- Added a dedicated baseline audio-session profile:
+  - category `.playback`
+  - mode `.moviePlayback`
+  - no mix/duck options
+  to remove audio-session policy as an eligibility variable during baseline diagnostics.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift

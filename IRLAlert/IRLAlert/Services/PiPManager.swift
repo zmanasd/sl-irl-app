@@ -99,7 +99,11 @@ final class PiPManager: NSObject, ObservableObject {
         }
 
         // Step 2 ordering: activate audio session before creating/starting PiP controller.
-        AudioSessionManager.shared.configureSession()
+        if playbackMode == .baselineRealMedia {
+            AudioSessionManager.shared.configureSessionForPiPBaseline()
+        } else {
+            AudioSessionManager.shared.configureSession()
+        }
         setupPlayerLayerIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
 
@@ -375,7 +379,15 @@ final class PiPManager: NSObject, ObservableObject {
     }
 
     private func makePiPController(for playerLayer: AVPlayerLayer) -> AVPictureInPictureController? {
-        guard let controller = AVPictureInPictureController(playerLayer: playerLayer) else {
+        let controller: AVPictureInPictureController?
+        if #available(iOS 15.0, *) {
+            let contentSource = AVPictureInPictureController.ContentSource(playerLayer: playerLayer)
+            controller = AVPictureInPictureController(contentSource: contentSource)
+        } else {
+            controller = AVPictureInPictureController(playerLayer: playerLayer)
+        }
+
+        guard let controller else {
             logger.error("Failed to create PiP controller for player layer.")
             lastFailureReason = "Failed to create PiP controller"
             return nil

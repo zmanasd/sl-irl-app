@@ -46,32 +46,39 @@ struct RootView: View {
         .overlay {
             if shouldKeepPiPHostAttached && pipManager.isBaselineRealMediaMode {
                 // Keep a 16:9 inline host so we can rule out wide-layer PiP eligibility edge cases.
-                VStack(spacing: 0) {
-                    PiPPlayerLayerHostView()
-                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                        .frame(maxWidth: 320)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(alignment: .bottomLeading) {
-                            Text("Baseline PiP Inline Media (16:9)")
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(.black.opacity(0.65))
-                                .foregroundStyle(.white)
-                                .clipShape(Capsule())
-                                .padding(.leading, 12)
-                                .padding(.bottom, 12)
-                        }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(.white.opacity(0.22), lineWidth: 1)
-                        }
-                    Spacer(minLength: 0)
+                GeometryReader { proxy in
+                    let inlineWidth = max(proxy.size.width - 24, 0)
+                    let inlineHeight = inlineWidth * (9.0 / 16.0)
+
+                    VStack(spacing: 0) {
+                        PiPPlayerLayerHostView()
+                            .frame(width: inlineWidth, height: inlineHeight)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay(alignment: .bottomLeading) {
+                                Text("Baseline PiP Inline Media (16:9)")
+                                    .font(.caption2.weight(.semibold))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(.black.opacity(0.65))
+                                    .foregroundStyle(.white)
+                                    .clipShape(Capsule())
+                                    .padding(.leading, 12)
+                                    .padding(.bottom, 12)
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(.white.opacity(0.22), lineWidth: 1)
+                            }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 14)
+                    .padding(.horizontal, 12)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .clipped()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, 14)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+                .ignoresSafeArea(edges: .top)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: router.currentFlow)
