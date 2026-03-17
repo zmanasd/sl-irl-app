@@ -46,7 +46,7 @@ struct RootView: View {
         .overlay {
             if shouldKeepPiPHostAttached && pipManager.isBaselineRealMediaMode {
                 // Step 1 baseline path: keep a real inline player visibly filling the window.
-                PiPPlayerHostView()
+                PiPPlayerLayerHostView()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)

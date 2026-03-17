@@ -134,7 +134,7 @@ final class PiPManager: NSObject, ObservableObject {
             logger.warning("PiP not possible. Ensure a valid video source is active.")
             queueDeferredStart(source: source)
             let stability = layerStabilityComponents(pipController.playerLayer)
-            let hostInWindow = playerViewController?.view.window != nil
+            let hostInWindow = hasHostWindowLikeAttachment()
             lastFailureReason = "PiP not possible yet (hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)))"
             scheduleStartRetry(source: source)
             return
@@ -156,9 +156,12 @@ final class PiPManager: NSObject, ObservableObject {
             observePlayerLayer(layer)
             setupPlayerLayerIfNeeded()
             ensurePiPControllerBoundToInitialLayer(layer)
+            if lastFailureReason == "PiP host not attached yet" || lastFailureReason == "PiP player layer missing (host not ready)" {
+                lastFailureReason = "none"
+            }
             return
         }
-        layer.videoGravity = .resizeAspectFill
+        layer.videoGravity = playbackMode == .baselineRealMedia ? .resizeAspect : .resizeAspectFill
         playerLayer = layer
         hasAttachedPlayerLayer = true
         observePlayerLayer(layer)
@@ -826,7 +829,7 @@ final class PiPManager: NSObject, ObservableObject {
     private func refreshDebugState() {
         isSupported = AVPictureInPictureController.isPictureInPictureSupported()
         hasAttachedPlayerViewController = playerViewController != nil
-        isHostViewInWindow = playerViewController?.view.window != nil
+        isHostViewInWindow = hasHostWindowLikeAttachment()
         hasPiPController = pipController != nil
         hasAttachedPlayerLayer = playerLayer != nil
         isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
@@ -874,6 +877,13 @@ final class PiPManager: NSObject, ObservableObject {
 
     private func yesNo(_ value: Bool) -> String {
         value ? "yes" : "no"
+    }
+
+    private func hasHostWindowLikeAttachment() -> Bool {
+        if let playerViewController {
+            return playerViewController.view.window != nil
+        }
+        return playerLayer?.superlayer != nil
     }
 }
 

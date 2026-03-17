@@ -1,6 +1,39 @@
 import AVKit
 import SwiftUI
 
+/// Hosts a direct AVPlayerLayer in the SwiftUI hierarchy for baseline PiP eligibility tests.
+struct PiPPlayerLayerHostView: UIViewRepresentable {
+    func makeUIView(context: Context) -> PlayerLayerHostView {
+        let view = PlayerLayerHostView()
+        PiPManager.shared.setPlayerLayer(view.playerLayer)
+        return view
+    }
+
+    func updateUIView(_ uiView: PlayerLayerHostView, context: Context) {
+        PiPManager.shared.setPlayerLayer(uiView.playerLayer)
+    }
+
+    final class PlayerLayerHostView: UIView {
+        override class var layerClass: AnyClass {
+            AVPlayerLayer.self
+        }
+
+        var playerLayer: AVPlayerLayer {
+            layer as! AVPlayerLayer
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            PiPManager.shared.setPlayerLayer(playerLayer)
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            PiPManager.shared.setPlayerLayer(playerLayer)
+        }
+    }
+}
+
 /// Hosts an AVPlayerViewController in the view hierarchy so PiP runs through AVKit-native playback.
 struct PiPPlayerHostView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> PlayerHostViewController {

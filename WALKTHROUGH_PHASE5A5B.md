@@ -177,6 +177,15 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - Updated debug overlay to always show `attempt`, `pending`, and `last` lines (including `none`) to avoid hidden-state ambiguity during testing.
 - Added scene-phase fallback start on `.background` (in addition to `.inactive`) so non-deterministic transition timing still triggers a PiP start attempt in baseline diagnostics mode.
 
+### 22) Baseline host path switched to direct AVPlayerLayer
+- In baseline diagnostics mode, switched host rendering from embedded `AVPlayerViewController` to a direct `AVPlayerLayer` host view.
+- This removes AVKit internal-layer discovery ambiguity so the PiP controller binds to the exact layer rendered inline.
+- Updated host-attachment debug signal to treat either:
+  - `AVPlayerViewController` window attachment, or
+  - direct `AVPlayerLayer` hierarchy attachment
+  as `hostWin: yes`.
+- Cleared stale “host not ready” failure text once the layer host is attached and controller binding proceeds.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
