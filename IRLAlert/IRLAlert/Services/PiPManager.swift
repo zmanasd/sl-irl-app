@@ -27,6 +27,7 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var lastFailureReason: String = "none"
     @Published private(set) var lastStartAttemptSource: String = "none"
     @Published private(set) var pendingDeferredStartSource: String = "none"
+    @Published private(set) var baselineSourceDescription: String = "unknown"
 
     private enum PlaybackMode {
         case baselineRealMedia
@@ -44,7 +45,8 @@ final class PiPManager: NSObject, ObservableObject {
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
     private let placeholderAssetVersion = 2
-    private let baselineMediaURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")
+    private let baselineProgressiveMediaURL = URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+    private let baselineHLSMediaURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")
 #if DEBUG
     private let playbackMode: PlaybackMode = .baselineRealMedia
 #else
@@ -269,12 +271,19 @@ final class PiPManager: NSObject, ObservableObject {
         switch playbackMode {
         case .baselineRealMedia:
             if let bundledClip = Bundle.main.url(forResource: "pip_baseline", withExtension: "mp4") {
+                baselineSourceDescription = "bundle-mp4"
                 return AVPlayerItem(url: bundledClip)
             }
-            guard let baselineMediaURL else { return nil }
-            return AVPlayerItem(url: baselineMediaURL)
+            if let baselineProgressiveMediaURL {
+                baselineSourceDescription = "remote-mp4"
+                return AVPlayerItem(url: baselineProgressiveMediaURL)
+            }
+            guard let baselineHLSMediaURL else { return nil }
+            baselineSourceDescription = "remote-hls"
+            return AVPlayerItem(url: baselineHLSMediaURL)
         case .statusPlaceholder:
             guard let url = placeholderVideoURL() else { return nil }
+            baselineSourceDescription = "status-placeholder"
             return AVPlayerItem(url: url)
         }
     }

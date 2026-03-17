@@ -87,7 +87,7 @@ struct RootView: View {
                         .font(.caption2)
                     Text("aspect: \(pipManager.boundLayerAspectDescription)")
                         .font(.caption2)
-                    Text("mode: \(pipManager.playbackModeDebugLabel)")
+                    Text("mode: \(pipManager.playbackModeDebugLabel)  source: \(pipManager.baselineSourceDescription)")
                         .font(.caption2)
                     Text("ready: \(pipManager.isReadyForDisplay ? "yes" : "no")  item: \(pipManager.itemStatusDescription)  time: \(pipManager.timeControlDescription)")
                         .font(.caption2)
