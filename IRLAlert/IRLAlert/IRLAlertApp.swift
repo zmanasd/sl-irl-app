@@ -95,6 +95,8 @@ struct RootView: View {
                         .font(.caption2)
                     Text("audio: \(pipManager.audioSessionStateDescription)")
                         .font(.caption2)
+                    Text("force: \(pipManager.forceStartArmedDescription)  delegate: \(pipManager.lastDelegateEventDescription)")
+                        .font(.caption2)
                     Text("attempt: \(pipManager.lastStartAttemptSource)")
                         .font(.caption2)
                     Text("pending: \(pipManager.pendingDeferredStartSource)")

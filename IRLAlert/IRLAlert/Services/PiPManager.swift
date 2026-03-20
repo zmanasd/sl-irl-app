@@ -32,6 +32,8 @@ final class PiPManager: NSObject, ObservableObject {
     @Published private(set) var itemHasVideoTrackDescription: String = "unknown"
     @Published private(set) var itemPresentationDescription: String = "missing"
     @Published private(set) var audioSessionStateDescription: String = "unknown"
+    @Published private(set) var forceStartArmedDescription: String = "no"
+    @Published private(set) var lastDelegateEventDescription: String = "none"
 
     private enum PlaybackMode {
         case baselineRealMedia
@@ -74,6 +76,7 @@ final class PiPManager: NSObject, ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var deferredStartSource: String?
     private var wantsStartWhenPossible = false
+    private var forceStartOverridePending = false
 
     private struct PiPStatusSnapshot {
         var lastAlert: String
@@ -132,11 +135,17 @@ final class PiPManager: NSObject, ObservableObject {
 
     func startIfPossible(source: String = "app", force: Bool = false) {
         lastStartAttemptSource = source
+        if force {
+            forceStartOverridePending = true
+            forceStartArmedDescription = "yes"
+            lastDelegateEventDescription = "force-armed"
+        }
         if playbackMode == .baselineRealMedia {
             AudioSessionManager.shared.configureSessionForPiPBaseline()
         } else {
             AudioSessionManager.shared.configureSession()
         }
+        let effectiveForce = force || forceStartOverridePending
         prepareIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
         queueDeferredStart(source: source)
@@ -147,11 +156,12 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
         player?.play()
-        attemptDeferredStartIfPossible(trigger: force ? "force request" : "start request")
-        if force, !pipController.isPictureInPictureActive {
+        attemptDeferredStartIfPossible(trigger: effectiveForce ? "force request" : "start request")
+        if effectiveForce, !pipController.isPictureInPictureActive {
             // Diagnostic path: call into AVKit directly even when eligibility remains false
             // so we can capture the delegate error code/domain for root-cause isolation.
-            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)))"
+            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(source))"
+            lastDelegateEventDescription = "force-start-invoked"
             pipController.startPictureInPicture()
             return
         }
@@ -161,7 +171,11 @@ final class PiPManager: NSObject, ObservableObject {
             let stability = diagnosticLayer.map { layerStabilityComponents($0) } ?? (inHierarchy: false, hasSize: false)
             let hostInWindow = hasHostWindowLikeAttachment()
             let aspect = diagnosticLayer.map { aspectDescription(for: $0.bounds) } ?? "missing"
-            lastFailureReason = "PiP pending eligibility (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
+            if effectiveForce {
+                lastFailureReason = "Forced start pending AVKit response (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
+            } else {
+                lastFailureReason = "PiP pending eligibility (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
+            }
         }
     }
 
@@ -974,6 +988,7 @@ final class PiPManager: NSObject, ObservableObject {
         let audioSession = AVAudioSession.sharedInstance()
         let audioActive = AudioSessionManager.shared.isSessionActive
         audioSessionStateDescription = "cat:\(audioSession.category.rawValue) mode:\(audioSession.mode.rawValue) active:\(yesNo(audioActive))"
+        forceStartArmedDescription = forceStartOverridePending ? "yes" : "no"
     }
 
     private func yesNo(_ value: Bool) -> String {
@@ -997,6 +1012,9 @@ final class PiPManager: NSObject, ObservableObject {
 extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = true
+        forceStartOverridePending = false
+        forceStartArmedDescription = "no"
+        lastDelegateEventDescription = "will-start"
         lastFailureReason = "none"
         refreshDebugState()
         logger.info("PiP starting.")
@@ -1004,17 +1022,22 @@ extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     }
 
     func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        lastDelegateEventDescription = "will-stop"
         logger.info("PiP stopping.")
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = false
+        lastDelegateEventDescription = "did-stop"
         refreshDebugState()
         logger.info("PiP stopped.")
         Task { await RelayClient.shared.updatePresence(directConnectionActive: UIApplication.shared.applicationState == .active) }
     }
 
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        forceStartOverridePending = false
+        forceStartArmedDescription = "no"
+        lastDelegateEventDescription = "failed-start"
         let nsError = error as NSError
         lastFailureReason = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
         queueDeferredStart(source: lastStartAttemptSource)
