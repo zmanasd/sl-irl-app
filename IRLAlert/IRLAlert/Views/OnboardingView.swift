@@ -87,6 +87,9 @@ struct OnboardingView: View {
             .padding(.top, 16)
         }
         .background(Color.appBackground.ignoresSafeArea())
+        .onChange(of: appSettings.pushNotificationsEnabled) { _, isEnabled in
+            Task { await PushNotificationManager.shared.handleUserToggle(enabled: isEnabled) }
+        }
     }
 
     private func advancePage() {
@@ -104,6 +107,7 @@ struct OnboardingView: View {
 
 struct OnboardingPageView: View {
     let pageIndex: Int
+    @EnvironmentObject var appSettings: AppSettings
     
     // Animation state for pulse rings
     @State private var isAnimating = false
@@ -219,6 +223,48 @@ struct OnboardingPageView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 32)
+            }
+
+            if pageIndex == 3 {
+                VStack(spacing: 12) {
+                    Toggle(isOn: $appSettings.pushNotificationsEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Push Alerts")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Receive alerts when the app is backgrounded.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.primary))
+                    .padding(16)
+                    .background(Color.appCard)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+
+                    Toggle(isOn: $appSettings.pipEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Picture-in-Picture")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Keeps alerts live while multitasking.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.primary))
+                    .padding(16)
+                    .background(Color.appCard)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
             }
             
             Spacer()

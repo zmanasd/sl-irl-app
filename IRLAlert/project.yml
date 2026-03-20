@@ -17,6 +17,11 @@ settings:
     ENABLE_PREVIEWS: YES
     SWIFT_STRICT_CONCURRENCY: complete
 
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: "16.1.1"
+
 targets:
   IRLAlert:
     type: application
@@ -29,15 +34,40 @@ targets:
           - "**/Info.plist"
     resources:
       - path: IRLAlert/Resources
+    dependencies:
+      - package: SocketIO
+        product: SocketIO
+      - target: IRLAlertNotificationService
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.irlalert.app
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: 6.0
+        CODE_SIGN_ENTITLEMENTS: IRLAlert/IRLAlert.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "IRL Alert"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_UIBackgroundModes: audio
+        INFOPLIST_KEY_UIBackgroundModes:
+          - audio
+          - "picture-in-picture"
+
+  IRLAlertNotificationService:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: IRLAlertNotificationService
+        excludes:
+          - "**/*.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.irlalert.app.notificationservice
+        INFOPLIST_FILE: IRLAlertNotificationService/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1,2"

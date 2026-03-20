@@ -25,23 +25,40 @@ final class AudioSessionManager: ObservableObject {
     /// Configure and activate the audio session for background alert playback.
     /// Must be called early in the app lifecycle (e.g. on app launch).
     func configureSession() {
+        configureAndActivateSession(
+            category: .playback,
+            mode: .default,
+            options: [.mixWithOthers, .duckOthers],
+            logLabel: "category=playback, mode=default, mixWithOthers+duckOthers"
+        )
+    }
+
+    /// Configure a stricter playback profile for PiP baseline diagnostics.
+    func configureSessionForPiPBaseline() {
+        configureAndActivateSession(
+            category: .playback,
+            mode: .moviePlayback,
+            options: [],
+            logLabel: "category=playback, mode=moviePlayback"
+        )
+    }
+
+    private func configureAndActivateSession(
+        category: AVAudioSession.Category,
+        mode: AVAudioSession.Mode,
+        options: AVAudioSession.CategoryOptions,
+        logLabel: String
+    ) {
         let session = AVAudioSession.sharedInstance()
         
         do {
-            // .playback = audio continues when screen locks / app backgrounds
-            // .mixWithOthers = our alerts mix over Spotify/Music instead of pausing them
-            // .duckOthers = briefly lower other audio volume while our alert plays
-            try session.setCategory(
-                .playback,
-                mode: .default,
-                options: [.mixWithOthers, .duckOthers]
-            )
+            try session.setCategory(category, mode: mode, options: options)
             
             try session.setActive(true)
             isSessionActive = true
             currentRoute = describeCurrentRoute(session)
             
-            logger.info("Audio session configured: category=playback, mixWithOthers+duckOthers, active=true")
+            logger.info("Audio session configured: \(logLabel, privacy: .public), active=true")
         } catch {
             logger.error("Failed to configure audio session: \(error.localizedDescription)")
             isSessionActive = false

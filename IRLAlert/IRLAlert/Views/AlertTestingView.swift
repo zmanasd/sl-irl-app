@@ -1,20 +1,14 @@
 import SwiftUI
 
-/// Alert testing screen — fire mock alerts through the queue engine.
+/// Alert testing screen — fire mock alerts through the queue engine to test audio/UI integration.
 struct AlertTestingView: View {
-    @State private var selectedAlertType: AlertType = .donation
-    @ObservedObject var queueManager = AlertQueueManager.shared
+    @StateObject private var viewModel = AlertTestingVM()
     @EnvironmentObject var settings: AppSettings
+    @State private var selectedAlertType: AlertType = .donation
     
     // For haptic feedback
     private let impactMed = UIImpactFeedbackGenerator(style: .medium)
     private let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
-    
-    // Columns for the 2x3 grid
-    private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
     
     var body: some View {
         ZStack {
@@ -24,78 +18,82 @@ struct AlertTestingView: View {
                 // Header
                 HStack {
                     Text("Test Control Center")
-                        .font(.system(size: 20, weight: .semibold, design: .default))
+                        .font(.title2.weight(.bold))
                         .tracking(-0.5)
                     Spacer()
-                    QueueStatusView()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
                 .padding(.top, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, 16)
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Readiness Section
                         readinessSection
+                        
+                        // Alert Types Grid
                         alertSelectionGrid
+                        
+                        // Config Section (Visual placeholders from HTML)
                         configSection
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 120) // Space for bottom tab bar + CTA
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 120) // Space for fixed deploy button + tab bar
                 }
             }
             
-            // Floating Deploy Button
+            // Fixed Deploy Button above Tab Bar
             VStack {
                 Spacer()
                 Button(action: deployTestAlert) {
                     HStack(spacing: 8) {
                         Image(systemName: "bolt.fill")
                         Text("Deploy Test Alert")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.headline.weight(.bold))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(DesignSystem.Colors.primaryBlue)
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: DesignSystem.Colors.primaryBlue.opacity(0.3), radius: 10, x: 0, y: 5)
+                    .cornerRadius(DesignSystem.Radius.medium)
+                    .shadow(color: DesignSystem.Colors.primaryBlue.opacity(0.3), radius: 10, y: 4)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 80) // Above tab bar
             }
         }
     }
     
-    // MARK: - Subviews
+    // MARK: - Subcomponents
     
     private var readinessSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(spacing: 16) {
             HStack {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .foregroundColor(DesignSystem.Colors.primaryBlue)
                     Text("SYSTEM READINESS")
-                        .font(.system(size: 12, weight: .bold))
-                        .tracking(1.5)
+                        .font(.caption.weight(.bold))
+                        .tracking(1.0)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Text("ONLINE")
+                Text(viewModel.isReady ? "ONLINE" : "OFFLINE")
                     .font(.system(size: 10, weight: .bold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.2))
-                    .foregroundColor(.green)
+                    .background(viewModel.isReady ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                    .foregroundColor(viewModel.isReady ? .green : .red)
                     .clipShape(Capsule())
             }
             
             VStack(spacing: 8) {
                 HStack {
                     Text("Signal Integrity")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text("100%")
-                        .font(.system(size: 14, weight: .bold))
+                    Text(viewModel.isReady ? "100%" : "0%")
+                        .font(.subheadline.weight(.bold))
                         .foregroundColor(DesignSystem.Colors.primaryBlue)
                 }
                 
@@ -104,8 +102,8 @@ struct AlertTestingView: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.secondary.opacity(0.2))
                         Capsule()
-                            .fill(DesignSystem.Colors.primaryBlue)
-                            .frame(width: geo.size.width)
+                            .fill(viewModel.isReady ? DesignSystem.Colors.primaryBlue : Color.gray)
+                            .frame(width: viewModel.isReady ? geo.size.width : 0)
                     }
                 }
                 .frame(height: 8)
@@ -113,29 +111,31 @@ struct AlertTestingView: View {
             
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 12))
-                Text("Audio session active. Testing engine ready.")
-                    .font(.system(size: 12))
+                    .font(.caption)
+                Text(viewModel.isReady ? "Testing engine connected and ready for deployment." : "Waiting for active service connection.")
+                    .font(.caption)
+                    .lineLimit(2)
             }
             .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(20)
         .background(Color.appCard)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .cornerRadius(DesignSystem.Radius.medium)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
         )
     }
     
     private var alertSelectionGrid: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("SIMULATE ALERT TYPES")
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1.5)
+                .font(.caption.weight(.bold))
+                .tracking(1.0)
                 .foregroundColor(.secondary)
             
-            LazyVGrid(columns: columns, spacing: 16) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 ForEach(AlertType.allCases) { type in
                     alertTypeButton(for: type)
                 }
@@ -156,7 +156,7 @@ struct AlertTestingView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(isSelected ? 0.2 : 0.1))
+                        .fill(color.opacity(isSelected ? 0.2 : 0.05))
                         .frame(width: 40, height: 40)
                     Image(systemName: type.iconName)
                         .foregroundColor(color)
@@ -165,58 +165,60 @@ struct AlertTestingView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(type.displayName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(.primary)
                     Text(mockDescription(for: type))
-                        .font(.system(size: 12))
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Color.appCard)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(isSelected ? Color.appCard : Color.appBackground)
+            .cornerRadius(DesignSystem.Radius.medium)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? color : Color.secondary.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                    .stroke(isSelected ? color : Color.secondary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
             )
         }
+        .buttonStyle(.plain)
     }
     
     private var configSection: some View {
         VStack(spacing: 0) {
             Toggle(isOn: $settings.ttsEnabled) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Read Alert Text (TTS)")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Speak the alert message out loud")
-                        .font(.system(size: 12))
+                    Text("Text-to-Speech")
+                        .font(.body.weight(.medium))
+                    Text("Read mock alert payload out loud")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.vertical, 16)
+            .tint(DesignSystem.Colors.primaryBlue)
+            .padding(16)
             
-            Divider().padding(.leading, 0)
+            Divider().padding(.leading, 16)
             
             Toggle(isOn: .constant(true)) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Bypass Audio Filters")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Play over other active audio sources")
-                        .font(.system(size: 12))
+                    Text("Force Audio Override")
+                        .font(.body.weight(.medium))
+                    Text("Bypass Do Not Disturb (Simulation only)")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.vertical, 16)
-            .disabled(true) // Just visual for now
+            .tint(DesignSystem.Colors.primaryBlue)
+            .padding(16)
+            .disabled(true)
         }
-        .padding(.horizontal, 20)
         .background(Color.appCard)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .cornerRadius(DesignSystem.Radius.medium)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
         )
     }
     
@@ -224,30 +226,7 @@ struct AlertTestingView: View {
     
     private func deployTestAlert() {
         if settings.hapticFeedbackEnabled { impactHeavy.impactOccurred() }
-        
-        let mockEvent: AlertEvent
-        switch selectedAlertType {
-        case .donation:
-            mockEvent = .mockDonation()
-        case .follow:
-            mockEvent = .mockFollow()
-        case .subscription:
-            mockEvent = .mockSubscription()
-        case .bits:
-            mockEvent = .mockBits()
-        case .host:
-            // Custom host mock since we don't have a factory for it yet
-            mockEvent = AlertEvent(type: .host, username: "BigStreamer", amount: 1234, source: .mock)
-        case .raid:
-            mockEvent = .mockRaid()
-        }
-        
-        // Ensure this alert type is enabled in settings for testing
-        if !settings.enabledAlertTypes.contains(selectedAlertType) {
-            settings.enabledAlertTypes.insert(selectedAlertType)
-        }
-        
-        queueManager.enqueue(mockEvent)
+        viewModel.sendTestAlert(type: selectedAlertType)
     }
     
     private func mockDescription(for type: AlertType) -> String {
