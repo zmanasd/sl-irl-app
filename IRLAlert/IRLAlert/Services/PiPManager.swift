@@ -148,6 +148,13 @@ final class PiPManager: NSObject, ObservableObject {
         }
         player?.play()
         attemptDeferredStartIfPossible(trigger: force ? "force request" : "start request")
+        if force, !pipController.isPictureInPictureActive {
+            // Diagnostic path: call into AVKit directly even when eligibility remains false
+            // so we can capture the delegate error code/domain for root-cause isolation.
+            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)))"
+            pipController.startPictureInPicture()
+            return
+        }
         if !pipController.isPictureInPicturePossible {
             logger.warning("PiP pending. Waiting for async eligibility.")
             let diagnosticLayer = pipBoundSourceLayer ?? playerLayer
