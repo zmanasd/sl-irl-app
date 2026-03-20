@@ -77,6 +77,7 @@ final class PiPManager: NSObject, ObservableObject {
     private var deferredStartSource: String?
     private var wantsStartWhenPossible = false
     private var forceStartOverridePending = false
+    private var forceStartNoCallbackTask: Task<Void, Never>?
 
     private struct PiPStatusSnapshot {
         var lastAlert: String
@@ -134,7 +135,10 @@ final class PiPManager: NSObject, ObservableObject {
     }
 
     func startIfPossible(source: String = "app", force: Bool = false) {
-        lastStartAttemptSource = source
+        let isAutoWhileForcePending = forceStartOverridePending && !force
+        if !isAutoWhileForcePending {
+            lastStartAttemptSource = source
+        }
         if force {
             forceStartOverridePending = true
             forceStartArmedDescription = "yes"
@@ -148,7 +152,10 @@ final class PiPManager: NSObject, ObservableObject {
         let effectiveForce = force || forceStartOverridePending
         prepareIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
-        queueDeferredStart(source: source)
+        let queuedSource = isAutoWhileForcePending
+            ? (deferredStartSource ?? lastStartAttemptSource)
+            : source
+        queueDeferredStart(source: queuedSource)
         refreshDebugState()
         guard let pipController else {
             lastFailureReason = "No PiP controller available"
@@ -160,9 +167,10 @@ final class PiPManager: NSObject, ObservableObject {
         if effectiveForce, !pipController.isPictureInPictureActive {
             // Diagnostic path: call into AVKit directly even when eligibility remains false
             // so we can capture the delegate error code/domain for root-cause isolation.
-            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(source))"
+            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(lastStartAttemptSource))"
             lastDelegateEventDescription = "force-start-invoked"
             pipController.startPictureInPicture()
+            scheduleForceStartNoCallbackCheck()
             return
         }
         if !pipController.isPictureInPicturePossible {
@@ -361,6 +369,22 @@ final class PiPManager: NSObject, ObservableObject {
         deferredStartSource = nil
         wantsStartWhenPossible = false
         pendingDeferredStartSource = "none"
+    }
+
+    private func scheduleForceStartNoCallbackCheck() {
+        forceStartNoCallbackTask?.cancel()
+        forceStartNoCallbackTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                guard let self else { return }
+                guard self.forceStartOverridePending else { return }
+                guard !self.isActive else { return }
+                guard self.lastDelegateEventDescription == "force-start-invoked" else { return }
+                self.lastDelegateEventDescription = "force-no-callback"
+                self.lastFailureReason = "Force start invoked; AVKit returned no start/fail callback (possible:\(self.yesNo(self.isPossible)))"
+                self.refreshDebugState()
+            }
+        }
     }
 
     private func attemptDeferredStartIfPossible(trigger: String) {
@@ -1012,6 +1036,8 @@ final class PiPManager: NSObject, ObservableObject {
 extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         isActive = true
+        forceStartNoCallbackTask?.cancel()
+        forceStartNoCallbackTask = nil
         forceStartOverridePending = false
         forceStartArmedDescription = "no"
         lastDelegateEventDescription = "will-start"
@@ -1035,6 +1061,8 @@ extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
     }
 
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        forceStartNoCallbackTask?.cancel()
+        forceStartNoCallbackTask = nil
         forceStartOverridePending = false
         forceStartArmedDescription = "no"
         lastDelegateEventDescription = "failed-start"
