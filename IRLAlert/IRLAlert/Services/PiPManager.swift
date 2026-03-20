@@ -150,6 +150,7 @@ final class PiPManager: NSObject, ObservableObject {
             AudioSessionManager.shared.configureSession()
         }
         let effectiveForce = force || forceStartOverridePending
+        let appStateIsActive = UIApplication.shared.applicationState == .active
         prepareIfNeeded()
         bindPlayerLayerFromHostedControllerIfNeeded()
         let queuedSource = isAutoWhileForcePending
@@ -162,17 +163,14 @@ final class PiPManager: NSObject, ObservableObject {
             scheduleStartRetry(source: source)
             return
         }
-        player?.play()
-        attemptDeferredStartIfPossible(trigger: effectiveForce ? "force request" : "start request")
-        if effectiveForce, !pipController.isPictureInPictureActive {
-            // Diagnostic path: call into AVKit directly even when eligibility remains false
-            // so we can capture the delegate error code/domain for root-cause isolation.
-            lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(lastStartAttemptSource))"
-            lastDelegateEventDescription = "force-start-invoked"
-            pipController.startPictureInPicture()
-            scheduleForceStartNoCallbackCheck()
+        if isAutoWhileForcePending && !appStateIsActive {
+            lastFailureReason = "Force start waiting for active app state"
+            refreshDebugState()
             return
         }
+        player?.play()
+        attemptDeferredStartIfPossible(trigger: effectiveForce ? "force request" : "start request")
+        maybeInvokeForcedStartIfNeeded(trigger: source)
         if !pipController.isPictureInPicturePossible {
             logger.warning("PiP pending. Waiting for async eligibility.")
             let diagnosticLayer = pipBoundSourceLayer ?? playerLayer
@@ -387,6 +385,21 @@ final class PiPManager: NSObject, ObservableObject {
         }
     }
 
+    private func maybeInvokeForcedStartIfNeeded(trigger: String) {
+        guard forceStartOverridePending else { return }
+        guard UIApplication.shared.applicationState == .active else { return }
+        guard let pipController else { return }
+        guard !pipController.isPictureInPictureActive else { return }
+        guard lastDelegateEventDescription != "force-start-invoked" else { return }
+
+        // Diagnostic path: call into AVKit directly even when eligibility remains false
+        // so we can capture the delegate error code/domain for root-cause isolation.
+        lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(lastStartAttemptSource) trigger:\(trigger))"
+        lastDelegateEventDescription = "force-start-invoked"
+        pipController.startPictureInPicture()
+        scheduleForceStartNoCallbackCheck()
+    }
+
     private func attemptDeferredStartIfPossible(trigger: String) {
         guard let pipController, let queuedSource = deferredStartSource else { return }
         guard wantsStartWhenPossible else { return }
@@ -539,6 +552,7 @@ final class PiPManager: NSObject, ObservableObject {
         if shouldAttemptStart {
             attemptDeferredStartIfPossible(trigger: trigger)
         }
+        maybeInvokeForcedStartIfNeeded(trigger: trigger)
         refreshDebugState()
     }
 
