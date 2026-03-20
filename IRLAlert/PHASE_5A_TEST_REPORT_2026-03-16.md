@@ -1,6 +1,6 @@
 # Phase 5A Test Report
 
-Date: March 16, 2026
+Date: March 16-20, 2026
 Branch: `codex/fix-xcode-build-errors`
 App: `IRLAlert`
 Focus: Phase 5A Picture-in-Picture (PiP), background execution, and related build/test readiness
@@ -28,6 +28,44 @@ At the end of testing, the app consistently reached a state where playback was:
 but PiP still remained:
 
 - `possible: no`
+
+## Addendum (March 20, 2026): Latest Diagnostic Findings
+
+Additional diagnostics and forced-start probes were implemented and tested on-device.
+
+Latest representative on-device state after force-start and background cycle:
+
+- `possible: no`
+- `vc: yes`
+- `layer: yes`
+- `ctrl: yes(legacy-player-layer)`
+- `stable: yes`
+- `hier: yes`
+- `size: yes`
+- `hostWin: yes`
+- `aspect: 1.78`
+- `source: remote-mp4`
+- `ready: yes`
+- `item: ready`
+- `time: playing`
+- `video: yes`
+- `pres: 1280x720`
+- `audio: cat: AVAudioSessionCategoryPlayback, mode: AVAudioSessionModeMoviePlayback, active: yes`
+- `force: yes`
+- `delegate: force-no-callback`
+- `attempt: debug button`
+- `pending: debug button`
+- `last: Force start invoked; AVKit returned no start/fail callback (possible:no)`
+
+Key observation from device behavior:
+
+- Lock-screen media controls appear for the app test media when the phone is locked, confirming active playback/now-playing session state.
+
+Interpretation:
+
+- Media readiness, layer hierarchy/size, audio category/mode/activation, and direct force invocation are all confirmed.
+- Even when calling `startPictureInPicture()` directly, AVKit does not produce `will-start` or `failed-to-start` callbacks in this path.
+- This shifts the leading risk from "media/layer not ready" toward platform/runtime policy behavior for this app/runtime context.
 
 ## Test Objectives
 
@@ -167,6 +205,7 @@ These outcomes were successfully verified:
 The unresolved failure is:
 
 - AVKit never transitions the current setup into a PiP-possible state.
+- A forced `startPictureInPicture()` call can be invoked without any delegate start/failure callback (`force-no-callback`), leaving PiP inactive.
 
 This remained true even after:
 
@@ -184,15 +223,16 @@ In practical terms, the app is currently trying to drive PiP using synthetic pla
 
 ## Recommendation For The Next Angle
 
-Do not continue iterating on the current placeholder-media PiP path as the primary approach.
+Do not continue broad tuning of placeholder/media readiness as the primary lever.
 
 Recommended next step:
 
-1. Pivot to a different PiP architecture instead of further tuning the fake-media approach.
-2. Re-evaluate whether the feature should use:
+1. Verify whether this is app-context policy behavior by reproducing PiP start in a minimal standalone AVKit sample on the same device/iOS version.
+2. Continue using the current diagnostics branch as the source of truth for PiP state, but focus on policy/lifecycle gating rather than media preparation.
+3. Re-evaluate whether the feature should use:
    - a more AVKit-native media playback path, or
    - a different background strategy altogether if the product goal is persistent alert monitoring rather than true media playback.
-3. Treat the current implementation as a useful diagnostic branch, not yet a validated production solution.
+4. Treat the current implementation as a useful diagnostic branch, not yet a validated production solution.
 
 ## Confidence Level
 
@@ -204,4 +244,3 @@ Reason:
 - Physical hardware was tested.
 - The failure is consistent across repeated attempts.
 - Debug instrumentation now provides reliable runtime visibility into the player/PiP state.
-

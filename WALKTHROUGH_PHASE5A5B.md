@@ -1,6 +1,6 @@
 # Phase 5A/5B Implementation Walkthrough (Work So Far)
 
-Date: 2026-03-16
+Date: 2026-03-20
 Branch: codex/fix-xcode-build-errors
 
 ## Context
@@ -211,6 +211,46 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 - Switched baseline inline host back to `AVPlayerViewController` (still 16:9) to probe whether iOS 26 PiP eligibility requires an AVKit-managed playback surface.
 - Re-enabled host view interaction for baseline host path during diagnostics to avoid potential eligibility rejection on non-interactive playback surfaces.
 
+### 27) Media-source and track diagnostics expansion
+- Added baseline source diagnostics and fallback ordering:
+  - bundled clip
+  - generated local fallback
+  - remote MP4
+  - remote HLS
+- Added debug state for:
+  - `source`
+  - `video` (video track presence)
+  - `pres` (presentation size)
+
+### 28) Reactive PiP start refactor
+- Reworked PiP start flow toward reactive eligibility:
+  - queue start intent
+  - observe `isPictureInPicturePossible`
+  - attempt start when eligibility flips asynchronously
+- Added layer bounds observation and re-evaluation hooks so controller binding can recover from early `0x0` layout states.
+- Reasserted baseline audio session profile at start attempt time.
+
+### 29) Forced-start diagnostic path
+- Added explicit forced PiP invocation path from debug control.
+- Added diagnostics for:
+  - force arm state
+  - last delegate event
+  - no-callback timeout path (`force-no-callback`)
+- Preserved force context across inactive/background transitions so auto retries do not mask force-attempt telemetry.
+- Restricted forced start invocation to active app state and auto-retry on readiness while active.
+
+### 30) Current highest-confidence finding
+- On physical device, app reaches a fully healthy playback state:
+  - `ctrl: yes(legacy-player-layer)`
+  - `stable: yes`
+  - `video: yes`
+  - `pres: 1280x720`
+  - `audio active: yes (playback/moviePlayback)`
+- Yet PiP remains `possible: no`, and forced `startPictureInPicture()` can yield:
+  - `delegate: force-no-callback`
+  - `last: Force start invoked; AVKit returned no start/fail callback (possible:no)`
+- Lock-screen media controls appear for app playback, confirming the playback session is active.
+
 ## Files Touched
 - IRLAlert/IRLAlert/IRLAlertApp.swift
 - IRLAlert/IRLAlert/Models/AppSettings.swift
@@ -244,11 +284,12 @@ Phase 5A introduces a PiP + backend relay + APNs architecture to replace silent 
 
 ## Known Gaps / Next Steps
 1. Configure APNs credentials and validate `/alert` end-to-end delivery.
-2. Do not continue iterating on the current placeholder-media PiP path as the primary approach.
-3. Pivot Phase 5A investigation toward a different architecture:
+2. Do not continue broad placeholder/media tuning as the primary PiP lever.
+3. Validate whether this is app-context/system policy behavior by reproducing PiP in a minimal standalone AVKit sample on the same iOS/device.
+4. Pivot Phase 5A investigation toward a different architecture:
    - a more AVKit-native playback/PiP path, or
    - a different background strategy if the true requirement is persistent alert monitoring rather than media playback.
-4. Revisit cleanup of legacy silent-audio code once the replacement direction is chosen.
+5. Revisit cleanup of legacy silent-audio code once the replacement direction is chosen.
 
 ## Notes
 - During debugging, `SilentAudioPlayer` was temporarily reintroduced into the PiP startup path to test whether AVKit required a stronger active background playback configuration.
