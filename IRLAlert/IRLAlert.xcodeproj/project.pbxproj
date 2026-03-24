@@ -21,7 +21,6 @@
 		44E9E8442F83CC1EEC574DC5 /* SilentAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */; };
 		4A60C46057C26D008C8AA188 /* DashboardVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE3D760213D2C420FF8AB72 /* DashboardVM.swift */; };
 		5A507D4DE27CB0ACD65AACEB /* DisconnectMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22234A40B6067C00E869A1D /* DisconnectMonitor.swift */; };
-		5AAFB4BA575DD3B1E81D90CA /* PiPPlayerHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0787C46C3F2F887C5D8C693A /* PiPPlayerHostView.swift */; };
 		5BBF913B1160F1050B53D91B /* AlertTestingVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5F7E66C382AB281C1D660E /* AlertTestingVM.swift */; };
 		5E7BABBE33C3B8E825B5C35A /* AlertType.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF28462DB803A303269851C /* AlertType.swift */; };
 		602183C1162991620067DEA1 /* AlertServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3284E64F36F8948755F99A5 /* AlertServiceProtocol.swift */; };
@@ -42,6 +41,7 @@
 		B6466B59332EE3D5AB2BD970 /* QueueStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25817FB1EB3F707F5AC4AE7A /* QueueStatusView.swift */; };
 		B99C8909FCA2B249298C7E9E /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = D0DD298C84AABFA10A94AF94 /* SocketIO */; };
 		BBE8E577210BAD49A414B1F5 /* IRLAlertNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CF7F245F14479757ACCBC502 /* IRLAlertNotificationService.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D087DABE85BF59E1A3205D06 /* PiPWindowHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5CD365BB374BCAA42FEA484 /* PiPWindowHelper.swift */; };
 		E55C940952B046D454567048 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E4772A6A5637D0677D6FDA /* TabBarView.swift */; };
 		EB2DF1E593433D0596780D35 /* StreamlabsSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7791D908D6EA98F8FFFA0A8A /* StreamlabsSocketService.swift */; };
 		F981B8BD62405D967DFA41EC /* IRLAlertApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BB09FE43512D7088C99CA2 /* IRLAlertApp.swift */; };
@@ -76,7 +76,6 @@
 		03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLogView.swift; sourceTree = "<group>"; };
 		06BFAA3C2AC23D09C52A1A04 /* EventLogVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLogVM.swift; sourceTree = "<group>"; };
 		06ED7A3550C5A6D08F708825 /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
-		0787C46C3F2F887C5D8C693A /* PiPPlayerHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiPPlayerHostView.swift; sourceTree = "<group>"; };
 		0B85C7B2E8D9F408CD7F4A53 /* IRLAlert.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IRLAlert.entitlements; sourceTree = "<group>"; };
 		0FD3BA2A2B6A95A64CACF7AD /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
 		19B695205EEB96224FC268A1 /* AlertQueueManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertQueueManager.swift; sourceTree = "<group>"; };
@@ -110,6 +109,7 @@
 		DC5F2A159090B4916BE174E6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		E22234A40B6067C00E869A1D /* DisconnectMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectMonitor.swift; sourceTree = "<group>"; };
 		E3284E64F36F8948755F99A5 /* AlertServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertServiceProtocol.swift; sourceTree = "<group>"; };
+		E5CD365BB374BCAA42FEA484 /* PiPWindowHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiPWindowHelper.swift; sourceTree = "<group>"; };
 		E9F60306B910E4A21310F44C /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		EB6B830C3A28C3D111328BFC /* IRLAlert.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IRLAlert.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F43C068E23DB4C2189CBE85C /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
@@ -204,6 +204,7 @@
 				32429B72293524B64F56CCD7 /* EventStore.swift */,
 				1F35FCA7F0E9CB9B44806302 /* MediaCacheManager.swift */,
 				8A1B56229994C73A163C48AD /* PiPManager.swift */,
+				E5CD365BB374BCAA42FEA484 /* PiPWindowHelper.swift */,
 				06ED7A3550C5A6D08F708825 /* PushNotificationManager.swift */,
 				E9F60306B910E4A21310F44C /* RelayClient.swift */,
 				8A0019BDFDCB62D1F29A3935 /* SilentAudioPlayer.swift */,
@@ -222,7 +223,6 @@
 				4717E6088F2CC6FC86576E84 /* DesignSystem.swift */,
 				03B7E1440C41A3C2B2F2DC7D /* EventLogView.swift */,
 				1EFB8D2865A027165D9776AF /* OnboardingView.swift */,
-				0787C46C3F2F887C5D8C693A /* PiPPlayerHostView.swift */,
 				2D28141FF1B5612042B97AEF /* PiPStatusView.swift */,
 				25817FB1EB3F707F5AC4AE7A /* QueueStatusView.swift */,
 				768E008DED73B2CC788ABFB7 /* SettingsView.swift */,
@@ -280,6 +280,14 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					0D705DD003F19B53E793C8E0 = {
+						ProvisioningStyle = Automatic;
+					};
+					9FED6A45DF8A0588AA9CC5DF = {
+						ProvisioningStyle = Automatic;
+					};
+				};
 			};
 			buildConfigurationList = 2241FFA810AF0372B9D7E628 /* Build configuration list for PBXProject "IRLAlert" */;
 			developmentRegion = en;
@@ -342,8 +350,8 @@
 				9D569F5A9DD9FA3F17C95BE3 /* NavigationRouter.swift in Sources */,
 				B33CFD929AC06EEE3E06040B /* OnboardingView.swift in Sources */,
 				7F0926B1FA14B76E12D7E62B /* PiPManager.swift in Sources */,
-				5AAFB4BA575DD3B1E81D90CA /* PiPPlayerHostView.swift in Sources */,
 				6ED6726E5F2112A305317152 /* PiPStatusView.swift in Sources */,
+				D087DABE85BF59E1A3205D06 /* PiPWindowHelper.swift in Sources */,
 				AB2D0832DCBED66FABFD1FE0 /* PushNotificationManager.swift in Sources */,
 				B6466B59332EE3D5AB2BD970 /* QueueStatusView.swift in Sources */,
 				6E917B7C340AE5139522EF86 /* RelayClient.swift in Sources */,
@@ -433,7 +441,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IRLAlert/IRLAlert.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -449,7 +457,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -459,7 +466,6 @@
 		B91E17F308AFEA0296755A05 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				INFOPLIST_FILE = IRLAlertNotificationService/Info.plist;
@@ -470,7 +476,6 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app.notificationservice;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -480,7 +485,6 @@
 		DD3F1C0F3949115D02FC8CB7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				INFOPLIST_FILE = IRLAlertNotificationService/Info.plist;
@@ -491,7 +495,6 @@
 					"@executable_path/../../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app.notificationservice;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -503,7 +506,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IRLAlert/IRLAlert.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MGTKZN7AVK;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -519,7 +522,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.irlalert.app;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

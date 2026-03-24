@@ -5,555 +5,194 @@ import UIKit
 import os.log
 
 /// Manages Picture-in-Picture lifecycle for background execution.
+///
+/// Uses `PiPWindowHelper` to host the AVPlayerLayer directly in the UIKit
+/// window hierarchy (not via SwiftUI), which is required for AVKit's
+/// internal scene discovery to mark PiP as eligible.
 @MainActor
 final class PiPManager: NSObject, ObservableObject {
 
     static let shared = PiPManager()
 
+    // MARK: - Published State
+
     @Published private(set) var isActive: Bool = false
     @Published private(set) var isSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
     @Published private(set) var isPossible: Bool = false
-    @Published private(set) var hasAttachedPlayerLayer: Bool = false
-    @Published private(set) var hasAttachedPlayerViewController: Bool = false
-    @Published private(set) var hasPiPController: Bool = false
-    @Published private(set) var isBoundLayerStable: Bool = false
-    @Published private(set) var isBoundLayerInHierarchy: Bool = false
-    @Published private(set) var isBoundLayerSized: Bool = false
-    @Published private(set) var isHostViewInWindow: Bool = false
-    @Published private(set) var boundLayerAspectDescription: String = "missing"
-    @Published private(set) var isReadyForDisplay: Bool = false
-    @Published private(set) var itemStatusDescription: String = "unknown"
-    @Published private(set) var timeControlDescription: String = "idle"
-    @Published private(set) var lastFailureReason: String = "none"
-    @Published private(set) var lastStartAttemptSource: String = "none"
-    @Published private(set) var pendingDeferredStartSource: String = "none"
-    @Published private(set) var baselineSourceDescription: String = "unknown"
-    @Published private(set) var pipControllerBindingDescription: String = "none"
-    @Published private(set) var itemHasVideoTrackDescription: String = "unknown"
-    @Published private(set) var itemPresentationDescription: String = "missing"
-    @Published private(set) var audioSessionStateDescription: String = "unknown"
-    @Published private(set) var forceStartArmedDescription: String = "no"
-    @Published private(set) var lastDelegateEventDescription: String = "none"
 
-    private enum PlaybackMode {
-        case baselineRealMedia
-        case statusPlaceholder
-
-        var debugLabel: String {
-            switch self {
-            case .baselineRealMedia:
-                return "baseline-real-media"
-            case .statusPlaceholder:
-                return "status-placeholder"
-            }
-        }
-    }
+    // MARK: - Private
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
-    private let placeholderAssetVersion = 2
-    private let baselineProgressiveMediaURL = URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
-    private let baselineHLSMediaURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")
-#if DEBUG
-    private let playbackMode: PlaybackMode = .baselineRealMedia
-#else
-    private let playbackMode: PlaybackMode = .statusPlaceholder
-#endif
     private var pipController: AVPictureInPictureController?
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
-    private var playerLayer: AVPlayerLayer?
-    private weak var pipBoundSourceLayer: AVPlayerLayer?
-    private weak var playerViewController: AVPlayerViewController?
     private var pipPossibleObservation: NSKeyValueObservation?
-    private var playerLayerReadyObservation: NSKeyValueObservation?
-    private var playerLayerBoundsObservation: NSKeyValueObservation?
     private var playerTimeControlObservation: NSKeyValueObservation?
     private var playerItemStatusObservation: NSKeyValueObservation?
-    private var didPrepare = false
-    private var isGeneratingPlaceholder = false
-    private var startRetryCount = 0
-    private let maxStartRetryCount = 3
+    private var didSetup = false
     private var refreshTask: Task<Void, Never>?
-    private var deferredStartSource: String?
-    private var wantsStartWhenPossible = false
-    private var forceStartOverridePending = false
-    private var forceStartNoCallbackTask: Task<Void, Never>?
+    private var setupRetryCount = 0
+    private var setupRetryTask: Task<Void, Never>?
 
-    private struct PiPStatusSnapshot {
-        var lastAlert: String
-        var isConnected: Bool
-        var queueCount: Int
+    private let placeholderAssetVersion = 3
+
+    private struct StatusSnapshot {
+        var lastAlert: String = "IRL Alert Active"
+        var isConnected: Bool = false
+        var queueCount: Int = 0
     }
 
-    private var statusSnapshot = PiPStatusSnapshot(
-        lastAlert: "IRL Alert Active",
-        isConnected: false,
-        queueCount: 0
-    )
-
-    var isBaselineRealMediaMode: Bool {
-        playbackMode == .baselineRealMedia
-    }
-
-    var playbackModeDebugLabel: String {
-        playbackMode.debugLabel
-    }
+    private var statusSnapshot = StatusSnapshot()
 
     // MARK: - Public API
 
-    func prepareIfNeeded() {
-        if didPrepare, pipController != nil { return }
-
+    /// Set up the PiP pipeline. Call once after the UIWindow is available.
+    func setup() {
+        guard !didSetup else { return }
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
             logger.warning("PiP not supported on this device.")
             isSupported = false
-            lastFailureReason = "PiP unsupported on this device"
             return
         }
 
-        // Step 2 ordering: activate audio session before creating/starting PiP controller.
-        if playbackMode == .baselineRealMedia {
-            AudioSessionManager.shared.configureSessionForPiPBaseline()
-        } else {
-            AudioSessionManager.shared.configureSession()
-        }
-        setupPlayerLayerIfNeeded()
-        bindPlayerLayerFromHostedControllerIfNeeded()
+        AudioSessionManager.shared.configureSession()
+        createPlayerIfNeeded()
 
-        guard let playerLayer else {
-            logger.warning("PiP player layer missing. Provide a PiP video source.")
-            lastFailureReason = playerViewController == nil
-                ? "PiP host not attached yet"
-                : "PiP player layer missing (host not ready)"
+        guard let player else {
+            logger.error("Failed to create AVPlayer for PiP.")
             return
         }
 
-        ensurePiPControllerBoundToInitialLayer(playerLayer)
-        player?.play()
-        refreshDebugState()
-        didPrepare = true
-    }
+        // Attach the player layer to the UIKit window via PiPWindowHelper
+        guard let window = findActiveWindow() else {
+            logger.warning("No UIWindow available yet. Will retry shortly.")
+            scheduleDeferredSetup()
+            return
+        }
 
-    func startIfPossible(source: String = "app", force: Bool = false) {
-        let isAutoWhileForcePending = forceStartOverridePending && !force
-        if !isAutoWhileForcePending {
-            lastStartAttemptSource = source
-        }
-        if force {
-            forceStartOverridePending = true
-            forceStartArmedDescription = "yes"
-            lastDelegateEventDescription = "force-armed"
-        }
-        if playbackMode == .baselineRealMedia {
-            AudioSessionManager.shared.configureSessionForPiPBaseline()
-        } else {
-            AudioSessionManager.shared.configureSession()
-        }
-        let effectiveForce = force || forceStartOverridePending
-        let appStateIsActive = UIApplication.shared.applicationState == .active
-        prepareIfNeeded()
-        bindPlayerLayerFromHostedControllerIfNeeded()
-        let queuedSource = isAutoWhileForcePending
-            ? (deferredStartSource ?? lastStartAttemptSource)
-            : source
-        queueDeferredStart(source: queuedSource)
-        refreshDebugState()
-        guard let pipController else {
-            lastFailureReason = "No PiP controller available"
-            scheduleStartRetry(source: source)
+        PiPWindowHelper.shared.attach(to: window, player: player)
+
+        guard let layer = PiPWindowHelper.shared.attachedLayer else {
+            logger.error("PiPWindowHelper failed to create player layer.")
             return
         }
-        if isAutoWhileForcePending && !appStateIsActive {
-            lastFailureReason = "Force start waiting for active app state"
-            refreshDebugState()
-            return
-        }
-        player?.play()
-        attemptDeferredStartIfPossible(trigger: effectiveForce ? "force request" : "start request")
-        maybeInvokeForcedStartIfNeeded(trigger: source)
-        if !pipController.isPictureInPicturePossible {
-            logger.warning("PiP pending. Waiting for async eligibility.")
-            let diagnosticLayer = pipBoundSourceLayer ?? playerLayer
-            let stability = diagnosticLayer.map { layerStabilityComponents($0) } ?? (inHierarchy: false, hasSize: false)
-            let hostInWindow = hasHostWindowLikeAttachment()
-            let aspect = diagnosticLayer.map { aspectDescription(for: $0.bounds) } ?? "missing"
-            if effectiveForce {
-                lastFailureReason = "Forced start pending AVKit response (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
-            } else {
-                lastFailureReason = "PiP pending eligibility (ctrl:\(pipControllerBindingDescription) hier:\(yesNo(stability.inHierarchy)) size:\(yesNo(stability.hasSize)) host:\(yesNo(hostInWindow)) aspect:\(aspect))"
+
+        // Create the PiP controller bound to the UIKit-hosted layer
+        let controller = AVPictureInPictureController(playerLayer: layer)
+        controller?.delegate = self
+        controller?.canStartPictureInPictureAutomaticallyFromInline = true
+        pipController = controller
+
+        // Observe eligibility
+        pipPossibleObservation = controller!.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observed, _ in
+            let possible = observed.isPictureInPicturePossible
+            Task { @MainActor in
+                self?.isPossible = possible
+                self?.logger.info("PiP possible: \(possible)")
             }
         }
+
+        player.play()
+        didSetup = true
+        logger.info("PiP setup complete. Waiting for eligibility.")
     }
 
+    /// Retry setup after a short delay (window may not be ready yet on initial SwiftUI appearance).
+    private func scheduleDeferredSetup() {
+        guard setupRetryCount < 5 else {
+            logger.error("PiP setup failed: no UIWindow available after 5 retries.")
+            return
+        }
+        setupRetryCount += 1
+        setupRetryTask?.cancel()
+        setupRetryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            self?.didSetup = false
+            self?.setup()
+        }
+    }
+
+    /// Stop PiP if it's currently active (e.g. when returning to foreground).
     func stopIfActive() {
         guard let pipController, pipController.isPictureInPictureActive else { return }
         pipController.stopPictureInPicture()
     }
 
-    /// Optionally provide a custom player layer (e.g., for a richer PiP view).
-    func setPlayerLayer(_ layer: AVPlayerLayer) {
-        if playerLayer === layer {
-            observePlayerLayer(layer)
-            setupPlayerLayerIfNeeded()
-            ensurePiPControllerBoundToInitialLayer(layer)
-            if lastFailureReason == "PiP host not attached yet" || lastFailureReason == "PiP player layer missing (host not ready)" {
-                lastFailureReason = "none"
-            }
-            return
-        }
-        layer.videoGravity = playbackMode == .baselineRealMedia ? .resizeAspect : .resizeAspectFill
-        playerLayer = layer
-        hasAttachedPlayerLayer = true
-        observePlayerLayer(layer)
-        setupPlayerLayerIfNeeded()
-        ensurePiPControllerBoundToInitialLayer(layer)
-        if lastFailureReason == "PiP host not attached yet" || lastFailureReason == "PiP player layer missing (host not ready)" {
-            lastFailureReason = "none"
-        }
-        refreshDebugState()
-        attemptDeferredStartIfPossible(trigger: "player layer attached")
-        didPrepare = true
-    }
-
-    /// Attach a hosted AVPlayerViewController so PiP uses AVKit-native playback surfaces.
-    func setPlayerViewController(_ controller: AVPlayerViewController) {
-        if playerViewController !== controller {
-            playerViewController = controller
-        }
-        hasAttachedPlayerViewController = true
-        configurePlayerViewController(controller)
-        setupPlayerLayerIfNeeded()
-        bindPlayerLayerFromHostedControllerIfNeeded()
-        refreshDebugState()
-        attemptDeferredStartIfPossible(trigger: "host attached")
-        didPrepare = true
-    }
-
+    /// Update the PiP status content (used for placeholder frame rendering).
     func updateStatus(lastAlert: String? = nil, isConnected: Bool? = nil, queueCount: Int? = nil) {
-        if let lastAlert, !lastAlert.isEmpty {
-            statusSnapshot.lastAlert = lastAlert
-        }
-        if let isConnected {
-            statusSnapshot.isConnected = isConnected
-        }
-        if let queueCount {
-            statusSnapshot.queueCount = queueCount
-        }
-
-        if playbackMode == .statusPlaceholder {
-            schedulePlaceholderRefresh()
-        }
+        if let lastAlert, !lastAlert.isEmpty { statusSnapshot.lastAlert = lastAlert }
+        if let isConnected { statusSnapshot.isConnected = isConnected }
+        if let queueCount { statusSnapshot.queueCount = queueCount }
+        schedulePlaceholderRefresh()
     }
 
-    func ensurePreviewPlayback() {
-        guard playerViewController != nil || playerLayer != nil else {
-            lastFailureReason = "Waiting for PiP host attachment"
-            return
-        }
-        prepareIfNeeded()
-        player?.play()
-        refreshDebugState()
-    }
+    // MARK: - Player Setup
 
-    // MARK: - Private Helpers
+    private func createPlayerIfNeeded() {
+        guard player == nil else { return }
 
-    private func setupPlayerLayerIfNeeded() {
-        if player == nil {
-            guard let item = makeInitialPlayerItem() else {
-                if playbackMode == .baselineRealMedia {
-                    lastFailureReason = "Baseline media source unavailable"
-                } else {
-                    lastFailureReason = "PiP placeholder unavailable"
-                }
-                return
-            }
-            setPlayerItem(item)
-            let newPlayer = AVPlayer(playerItem: item)
-            newPlayer.isMuted = playbackMode != .baselineRealMedia
-            newPlayer.actionAtItemEnd = .none
-            newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
-            newPlayer.automaticallyWaitsToMinimizeStalling = true
-            player = newPlayer
-            observePlayer(newPlayer)
-        }
-
-        if let playerViewController {
-            configurePlayerViewController(playerViewController)
-        }
-
-        if let player {
-            if let existingLayer = playerLayer {
-                if existingLayer.player !== player {
-                    existingLayer.player = player
-                }
-            }
-        }
-
-        bindPlayerLayerFromHostedControllerIfNeeded()
-        if let playerLayer {
-            ensurePiPControllerBoundToInitialLayer(playerLayer)
-        }
-
-        refreshDebugState()
-    }
-
-    private func makeInitialPlayerItem() -> AVPlayerItem? {
-        switch playbackMode {
-        case .baselineRealMedia:
-            if let bundledClip = Bundle.main.url(forResource: "pip_baseline", withExtension: "mp4") {
-                baselineSourceDescription = "bundle-mp4"
-                return AVPlayerItem(url: bundledClip)
-            }
-            if let generatedClip = placeholderFileURL(), FileManager.default.fileExists(atPath: generatedClip.path) {
-                baselineSourceDescription = "generated-local"
-                return AVPlayerItem(url: generatedClip)
-            }
-            // Generate a local fallback clip opportunistically, then continue with remote URLs.
-            _ = placeholderVideoURL()
-            if let baselineProgressiveMediaURL {
-                baselineSourceDescription = "remote-mp4"
-                return AVPlayerItem(url: baselineProgressiveMediaURL)
-            }
-            guard let baselineHLSMediaURL else { return nil }
-            baselineSourceDescription = "remote-hls"
-            return AVPlayerItem(url: baselineHLSMediaURL)
-        case .statusPlaceholder:
-            guard let url = placeholderVideoURL() else { return nil }
-            baselineSourceDescription = "status-placeholder"
-            return AVPlayerItem(url: url)
-        }
-    }
-
-    private func ensurePiPControllerBoundToInitialLayer(_ layer: AVPlayerLayer) {
-        if pipController == nil {
-            guard isLayerStableForPiP(layer) else {
-                logger.debug("Deferring PiP controller creation until player layer is stable.")
-                return
-            }
-            pipController = makePiPController(for: layer)
-            pipBoundSourceLayer = layer
+        guard let item = makePlayerItem() else {
+            logger.error("Failed to create player item for PiP.")
             return
         }
 
-        guard let existingLayer = pipBoundSourceLayer, existingLayer !== layer else { return }
-        if !isLayerStableForPiP(existingLayer), isLayerStableForPiP(layer), !isActive {
-            logger.notice("Rebinding PiP controller once from unstable initial layer to stable layer.")
-            pipController = makePiPController(for: layer)
-            pipBoundSourceLayer = layer
-            return
-        }
+        playerItem = item
+        observePlayerItem(item)
 
-        logger.notice("Ignoring player-layer rebind to preserve single PiP controller lifetime.")
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(loopPlayerItem),
+            name: .AVPlayerItemDidPlayToEndTime, object: item
+        )
+
+        let newPlayer = AVPlayer(playerItem: item)
+        newPlayer.isMuted = true
+        newPlayer.actionAtItemEnd = .none
+        newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
+        newPlayer.automaticallyWaitsToMinimizeStalling = true
+        player = newPlayer
+        observePlayer(newPlayer)
     }
 
-    private func layerStabilityComponents(_ layer: AVPlayerLayer) -> (inHierarchy: Bool, hasSize: Bool) {
-        let inHierarchy = layer.superlayer != nil
-        let hasSize = !layer.bounds.isEmpty
-        return (inHierarchy, hasSize)
+    private func makePlayerItem() -> AVPlayerItem? {
+        // Try bundled clip first
+        if let bundled = Bundle.main.url(forResource: "pip_baseline", withExtension: "mp4") {
+            return AVPlayerItem(url: bundled)
+        }
+        // Try cached generated placeholder
+        if let cached = placeholderFileURL(), FileManager.default.fileExists(atPath: cached.path) {
+            return AVPlayerItem(url: cached)
+        }
+        // Generate placeholder in background, use remote fallback for now
+        generatePlaceholderAsync()
+        let remoteURL = URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")!
+        return AVPlayerItem(url: remoteURL)
     }
 
-    private func isLayerStableForPiP(_ layer: AVPlayerLayer) -> Bool {
-        let components = layerStabilityComponents(layer)
-        return components.inHierarchy && components.hasSize
-    }
-
-    private func queueDeferredStart(source: String) {
-        deferredStartSource = source
-        wantsStartWhenPossible = true
-        pendingDeferredStartSource = source
-    }
-
-    private func clearDeferredStart() {
-        deferredStartSource = nil
-        wantsStartWhenPossible = false
-        pendingDeferredStartSource = "none"
-    }
-
-    private func scheduleForceStartNoCallbackCheck() {
-        forceStartNoCallbackTask?.cancel()
-        forceStartNoCallbackTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await MainActor.run {
-                guard let self else { return }
-                guard self.forceStartOverridePending else { return }
-                guard !self.isActive else { return }
-                guard self.lastDelegateEventDescription == "force-start-invoked" else { return }
-                self.lastDelegateEventDescription = "force-no-callback"
-                self.lastFailureReason = "Force start invoked; AVKit returned no start/fail callback (possible:\(self.yesNo(self.isPossible)))"
-                self.refreshDebugState()
-            }
-        }
-    }
-
-    private func maybeInvokeForcedStartIfNeeded(trigger: String) {
-        guard forceStartOverridePending else { return }
-        guard UIApplication.shared.applicationState == .active else { return }
-        guard let pipController else { return }
-        guard !pipController.isPictureInPictureActive else { return }
-        guard lastDelegateEventDescription != "force-start-invoked" else { return }
-
-        // Diagnostic path: call into AVKit directly even when eligibility remains false
-        // so we can capture the delegate error code/domain for root-cause isolation.
-        lastFailureReason = "Forced start requested (possible:\(yesNo(pipController.isPictureInPicturePossible)) source:\(lastStartAttemptSource) trigger:\(trigger))"
-        lastDelegateEventDescription = "force-start-invoked"
-        pipController.startPictureInPicture()
-        scheduleForceStartNoCallbackCheck()
-    }
-
-    private func attemptDeferredStartIfPossible(trigger: String) {
-        guard let pipController, let queuedSource = deferredStartSource else { return }
-        guard wantsStartWhenPossible else { return }
-        guard pipController.isPictureInPicturePossible else { return }
-
-        clearDeferredStart()
-        startRetryCount = 0
-        lastStartAttemptSource = "\(queuedSource) -> \(trigger)"
-        lastFailureReason = "none"
-        pipController.startPictureInPicture()
-    }
-
-    private func configurePlayerViewController(_ controller: AVPlayerViewController) {
-        controller.player = player
-        controller.allowsPictureInPicturePlayback = true
-        controller.canStartPictureInPictureAutomaticallyFromInline = true
-        switch playbackMode {
-        case .baselineRealMedia:
-            controller.showsPlaybackControls = true
-            controller.updatesNowPlayingInfoCenter = true
-            controller.videoGravity = .resizeAspect
-        case .statusPlaceholder:
-            controller.showsPlaybackControls = false
-            controller.updatesNowPlayingInfoCenter = false
-            controller.videoGravity = .resizeAspectFill
-        }
-    }
-
-    private func bindPlayerLayerFromHostedControllerIfNeeded() {
-        guard let playerViewController else { return }
-        guard let discoveredLayer = findPlayerLayer(in: playerViewController.view.layer) else {
-            hasAttachedPlayerLayer = playerLayer != nil
-            return
-        }
-
-        if discoveredLayer.player !== player {
-            discoveredLayer.player = player
-        }
-
-        if playerLayer !== discoveredLayer {
-            playerLayer = discoveredLayer
-            observePlayerLayer(discoveredLayer)
-        }
-
-        ensurePiPControllerBoundToInitialLayer(discoveredLayer)
-        hasAttachedPlayerLayer = true
-    }
-
-    private func findPlayerLayer(in rootLayer: CALayer?) -> AVPlayerLayer? {
-        guard let rootLayer else { return nil }
-        if let foundLayer = rootLayer as? AVPlayerLayer {
-            return foundLayer
-        }
-        for sublayer in rootLayer.sublayers ?? [] {
-            if let foundLayer = findPlayerLayer(in: sublayer) {
-                return foundLayer
-            }
-        }
-        return nil
-    }
-
-    private func makePiPController(for playerLayer: AVPlayerLayer) -> AVPictureInPictureController? {
-        let controller: AVPictureInPictureController?
-        if #available(iOS 15.0, *) {
-            if playbackMode == .baselineRealMedia {
-                // Keep baseline tests on the legacy AVPlayerLayer binding path to avoid
-                // ContentSource-specific eligibility edge cases on newer iOS builds.
-                controller = AVPictureInPictureController(playerLayer: playerLayer)
-                pipControllerBindingDescription = "legacy-player-layer"
-            } else {
-                let contentSource = AVPictureInPictureController.ContentSource(playerLayer: playerLayer)
-                controller = AVPictureInPictureController(contentSource: contentSource)
-                pipControllerBindingDescription = "content-source"
-            }
-        } else {
-            controller = AVPictureInPictureController(playerLayer: playerLayer)
-            pipControllerBindingDescription = "legacy-player-layer"
-        }
-
-        guard let controller else {
-            logger.error("Failed to create PiP controller for player layer.")
-            lastFailureReason = "Failed to create PiP controller"
-            pipControllerBindingDescription = "none"
-            return nil
-        }
-
-        controller.delegate = self
-        controller.canStartPictureInPictureAutomaticallyFromInline = true
-        if playbackMode == .statusPlaceholder {
-            controller.requiresLinearPlayback = false
-        }
-        pipPossibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observedController, _ in
-            let isPossible = observedController.isPictureInPicturePossible
-            Task { @MainActor in
-                self?.isPossible = isPossible
-                if isPossible {
-                    self?.attemptDeferredStartIfPossible(trigger: "possible=true")
-                }
-            }
-        }
-        return controller
-    }
+    // MARK: - Player Observation
 
     private func observePlayer(_ player: AVPlayer) {
-        playerTimeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] observedPlayer, _ in
-            let description: String
-            switch observedPlayer.timeControlStatus {
-            case .paused:
-                description = "paused"
-            case .waitingToPlayAtSpecifiedRate:
-                description = "waiting"
-            case .playing:
-                description = "playing"
-            @unknown default:
-                description = "unknown"
-            }
-
+        playerTimeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor in
-                self?.timeControlDescription = description
-                if observedPlayer.timeControlStatus == .playing {
-                    self?.attemptDeferredStartIfPossible(trigger: "timeControl=playing")
+                if observed.timeControlStatus == .playing {
+                    self?.logger.debug("Player time control: playing")
                 }
             }
         }
     }
 
-    private func observePlayerLayer(_ layer: AVPlayerLayer) {
-        playerLayerReadyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] observedLayer, _ in
-            let ready = observedLayer.isReadyForDisplay
+    private func observePlayerItem(_ item: AVPlayerItem) {
+        playerItemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor in
-                self?.isReadyForDisplay = ready
-                if ready {
-                    self?.reevaluateLayerState(trigger: "readyForDisplay", shouldAttemptStart: true)
-                } else {
-                    self?.refreshDebugState()
+                switch observed.status {
+                case .readyToPlay:
+                    self?.logger.debug("Player item ready to play.")
+                case .failed:
+                    self?.logger.error("Player item failed: \(observed.error?.localizedDescription ?? "unknown")")
+                default:
+                    break
                 }
             }
         }
-        playerLayerBoundsObservation = layer.observe(\.bounds, options: [.initial, .new]) { [weak self] _, _ in
-            Task { @MainActor in
-                self?.reevaluateLayerState(trigger: "layer bounds updated", shouldAttemptStart: true)
-            }
-        }
-    }
-
-    private func reevaluateLayerState(trigger: String, shouldAttemptStart: Bool) {
-        if let activeLayer = playerLayer ?? pipBoundSourceLayer {
-            ensurePiPControllerBoundToInitialLayer(activeLayer)
-        }
-        if shouldAttemptStart {
-            attemptDeferredStartIfPossible(trigger: trigger)
-        }
-        maybeInvokeForcedStartIfNeeded(trigger: trigger)
-        refreshDebugState()
     }
 
     @objc private func loopPlayerItem() {
@@ -561,529 +200,246 @@ final class PiPManager: NSObject, ObservableObject {
         player?.play()
     }
 
+    // MARK: - Placeholder Video Generation
+
     private func placeholderFileURL() -> URL? {
-        let fileManager = FileManager.default
-        guard let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            logger.error("Unable to locate caches directory for PiP placeholder.")
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             return nil
         }
-
         return caches.appendingPathComponent("pip_placeholder_v\(placeholderAssetVersion).mp4")
     }
 
-    private func placeholderVideoURL() -> URL? {
-        let fileManager = FileManager.default
-        guard let url = placeholderFileURL() else { return nil }
-        if fileManager.fileExists(atPath: url.path) {
-            return url
-        }
+    private func generatePlaceholderAsync() {
+        guard let url = placeholderFileURL() else { return }
+        guard !FileManager.default.fileExists(atPath: url.path) else { return }
 
-        guard !isGeneratingPlaceholder else { return nil }
-        isGeneratingPlaceholder = true
-
-        Task.detached { [weak self] in
-            await self?.generatePlaceholderVideo(at: url)
-            await MainActor.run {
-                PiPManager.shared.setupPlayerLayerIfNeeded()
-            }
-        }
-
-        return nil
-    }
-
-    private func scheduleStartRetry(source: String) {
-        guard startRetryCount < maxStartRetryCount else { return }
-        startRetryCount += 1
-        Task {
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self.startIfPossible(source: "\(source) retry \(self.startRetryCount)")
+        let targetURL = url
+        Task { @MainActor [weak self] in
+            await self?.generatePlaceholderVideo(at: targetURL)
+            guard let self, let url = self.placeholderFileURL(),
+                  FileManager.default.fileExists(atPath: url.path) else { return }
+            let item = AVPlayerItem(url: url)
+            self.swapPlayerItem(item)
         }
     }
 
     private func schedulePlaceholderRefresh() {
         refreshTask?.cancel()
-        refreshTask = Task { [weak self] in
+        refreshTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 400_000_000)
-            await self?.regeneratePlaceholderVideo()
+            guard let self else { return }
+            guard let url = self.placeholderFileURL() else { return }
+            try? FileManager.default.removeItem(at: url)
+            await self.generatePlaceholderVideo(at: url)
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            let item = AVPlayerItem(url: url)
+            self.swapPlayerItem(item)
         }
     }
 
-    private func setPlayerItem(_ item: AVPlayerItem) {
-        if let existing = playerItem {
-            NotificationCenter.default.removeObserver(
-                self,
-                name: .AVPlayerItemDidPlayToEndTime,
-                object: existing
-            )
+    private func swapPlayerItem(_ item: AVPlayerItem) {
+        if let old = playerItem {
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: old)
         }
-
         playerItem = item
         observePlayerItem(item)
-
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(loopPlayerItem),
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: item
+            self, selector: #selector(loopPlayerItem),
+            name: .AVPlayerItemDidPlayToEndTime, object: item
         )
-    }
-
-    private func observePlayerItem(_ item: AVPlayerItem) {
-        playerItemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
-            let description: String
-            switch observedItem.status {
-            case .unknown:
-                description = "unknown"
-            case .readyToPlay:
-                description = "ready"
-            case .failed:
-                description = "failed"
-            @unknown default:
-                description = "unknown"
-            }
-
-            Task { @MainActor in
-                self?.itemStatusDescription = description
-                if observedItem.status == .failed {
-                    self?.lastFailureReason = observedItem.error?.localizedDescription ?? "Player item failed"
-                }
-            }
-        }
-    }
-
-    private func regeneratePlaceholderVideo() async {
-        guard let url = placeholderFileURL() else { return }
-        guard !isGeneratingPlaceholder else { return }
-        isGeneratingPlaceholder = true
-        do {
-            try FileManager.default.removeItem(at: url)
-        } catch {
-            // ignore
-        }
-
-        await generatePlaceholderVideo(at: url)
-
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        let item = AVPlayerItem(url: url)
-        setPlayerItem(item)
         player?.replaceCurrentItem(with: item)
-        if isActive {
-            player?.play()
-        }
+        if isActive { player?.play() }
     }
 
     private func generatePlaceholderVideo(at url: URL) async {
-        defer {
-            Task { @MainActor in
-                self.isGeneratingPlaceholder = false
-                self.setupPlayerLayerIfNeeded()
-            }
-        }
-
-        do {
-            try FileManager.default.removeItem(at: url)
-        } catch {
-            // Ignore if file didn't exist
-        }
-
-        let width = 320
-        let height = 180
+        let width = 320, height = 180
         let fps: Int32 = 30
-        let durationSeconds = 1
-        let tempVideoURL = url.deletingLastPathComponent().appendingPathComponent("pip_placeholder_video.mp4")
-        let tempAudioURL = url.deletingLastPathComponent().appendingPathComponent("pip_placeholder_audio.caf")
 
         do {
-            try FileManager.default.removeItem(at: tempVideoURL)
-        } catch {
-            // Ignore if file didn't exist
-        }
+            // Generate video track
+            let tempVideoURL = url.deletingLastPathComponent().appendingPathComponent("pip_temp_video.mp4")
+            let tempAudioURL = url.deletingLastPathComponent().appendingPathComponent("pip_temp_audio.caf")
+            try? FileManager.default.removeItem(at: tempVideoURL)
+            try? FileManager.default.removeItem(at: tempAudioURL)
 
-        do {
-            try FileManager.default.removeItem(at: tempAudioURL)
-        } catch {
-            // Ignore if file didn't exist
-        }
+            try await writeVideoTrack(to: tempVideoURL, width: width, height: height, fps: fps)
+            try writeSilentAudioTrack(to: tempAudioURL, duration: 1.0)
+            try await mergeMedia(videoURL: tempVideoURL, audioURL: tempAudioURL, outputURL: url)
 
-        do {
-            try await writePlaceholderVideoOnly(
-                to: tempVideoURL,
-                width: width,
-                height: height,
-                fps: fps,
-                durationSeconds: durationSeconds,
-                snapshot: statusSnapshot
-            )
-            try writeSilentAudioTrack(to: tempAudioURL, durationSeconds: Double(durationSeconds))
-            try await mergePlaceholderMedia(videoURL: tempVideoURL, audioURL: tempAudioURL, outputURL: url)
+            try? FileManager.default.removeItem(at: tempVideoURL)
+            try? FileManager.default.removeItem(at: tempAudioURL)
         } catch {
-            logger.error("Failed to generate PiP placeholder: \(error.localizedDescription)")
+            logger.error("Placeholder generation failed: \(error.localizedDescription)")
         }
-
-        try? FileManager.default.removeItem(at: tempVideoURL)
-        try? FileManager.default.removeItem(at: tempAudioURL)
     }
 
-    private func writePlaceholderVideoOnly(
-        to url: URL,
-        width: Int,
-        height: Int,
-        fps: Int32,
-        durationSeconds: Int,
-        snapshot: PiPStatusSnapshot
-    ) async throws {
-        let frameCount = fps * Int32(durationSeconds)
+    private func writeVideoTrack(to url: URL, width: Int, height: Int, fps: Int32) async throws {
         let writer = try AVAssetWriter(url: url, fileType: .mp4)
         let settings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height
         ]
-
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
 
-        let attributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
-            kCVPixelBufferWidthKey as String: width,
-            kCVPixelBufferHeightKey as String: height
-        ]
-
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: input,
-            sourcePixelBufferAttributes: attributes
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height
+            ]
         )
 
         guard writer.canAdd(input) else {
-            throw NSError(domain: "PiPPlaceholder", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Unable to add video input to AVAssetWriter."
-            ])
+            throw NSError(domain: "PiP", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot add video input."])
         }
         writer.add(input)
-
         writer.startWriting()
         writer.startSession(atSourceTime: .zero)
 
+        let frameCount = fps  // 1 second
         for frame in 0..<frameCount {
             while !input.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 5_000_000)
             }
-
-            guard let buffer = makePixelBuffer(width: width, height: height, snapshot: snapshot) else { continue }
-            let time = CMTime(value: CMTimeValue(frame), timescale: fps)
-            adaptor.append(buffer, withPresentationTime: time)
+            guard let buffer = makeStatusFrame(width: width, height: height) else { continue }
+            adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps))
         }
 
         input.markAsFinished()
-
-        await withCheckedContinuation { continuation in
-            writer.finishWriting {
-                continuation.resume()
-            }
-        }
+        await withCheckedContinuation { c in writer.finishWriting { c.resume() } }
 
         if writer.status != .completed {
-            throw writer.error ?? NSError(domain: "PiPPlaceholder", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Video writer failed to finish."
-            ])
+            throw writer.error ?? NSError(domain: "PiP", code: 2)
         }
     }
 
-    private func writeSilentAudioTrack(to url: URL, durationSeconds: Double) throws {
+    private func writeSilentAudioTrack(to url: URL, duration: Double) throws {
         let sampleRate = 44_100.0
-        let channelCount: AVAudioChannelCount = 1
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: sampleRate,
-            channels: channelCount,
-            interleaved: false
-        ) else {
-            throw NSError(domain: "PiPPlaceholder", code: 3, userInfo: [
-                NSLocalizedDescriptionKey: "Unable to create audio format."
-            ])
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false) else {
+            throw NSError(domain: "PiP", code: 3)
         }
-
-        let frameCount = AVAudioFrameCount(sampleRate * durationSeconds)
+        let frameCount = AVAudioFrameCount(sampleRate * duration)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
-            throw NSError(domain: "PiPPlaceholder", code: 4, userInfo: [
-                NSLocalizedDescriptionKey: "Unable to create silent audio buffer."
-            ])
+            throw NSError(domain: "PiP", code: 4)
         }
-
         buffer.frameLength = frameCount
-        if let channelData = buffer.floatChannelData {
-            for channel in 0..<Int(channelCount) {
-                memset(channelData[channel], 0, Int(frameCount) * MemoryLayout<Float>.size)
-            }
+        if let data = buffer.floatChannelData {
+            memset(data[0], 0, Int(frameCount) * MemoryLayout<Float>.size)
         }
-
-        let audioFile = try AVAudioFile(
-            forWriting: url,
-            settings: format.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
-        try audioFile.write(from: buffer)
+        let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+        try file.write(from: buffer)
     }
 
-    private func mergePlaceholderMedia(videoURL: URL, audioURL: URL, outputURL: URL) async throws {
+    private func mergeMedia(videoURL: URL, audioURL: URL, outputURL: URL) async throws {
         let composition = AVMutableComposition()
         let videoAsset = AVURLAsset(url: videoURL)
         let audioAsset = AVURLAsset(url: audioURL)
-
         let duration = try await videoAsset.load(.duration)
-        guard let sourceVideoTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
-              let compositionVideoTrack = composition.addMutableTrack(
-                withMediaType: .video,
-                preferredTrackID: kCMPersistentTrackID_Invalid
-              ) else {
-            throw NSError(domain: "PiPPlaceholder", code: 5, userInfo: [
-                NSLocalizedDescriptionKey: "Unable to load placeholder video track."
-            ])
+
+        if let vTrack = try await videoAsset.loadTracks(withMediaType: .video).first,
+           let cTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try cTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: vTrack, at: .zero)
+            cTrack.preferredTransform = try await vTrack.load(.preferredTransform)
+        }
+        if let aTrack = try await audioAsset.loadTracks(withMediaType: .audio).first,
+           let cTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try cTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: aTrack, at: .zero)
         }
 
-        try compositionVideoTrack.insertTimeRange(
-            CMTimeRange(start: .zero, duration: duration),
-            of: sourceVideoTrack,
-            at: .zero
-        )
-        compositionVideoTrack.preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
-
-        if let sourceAudioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first,
-           let compositionAudioTrack = composition.addMutableTrack(
-            withMediaType: .audio,
-            preferredTrackID: kCMPersistentTrackID_Invalid
-           ) {
-            try compositionAudioTrack.insertTimeRange(
-                CMTimeRange(start: .zero, duration: duration),
-                of: sourceAudioTrack,
-                at: .zero
-            )
+        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw NSError(domain: "PiP", code: 5)
         }
-
-        guard let exportSession = AVAssetExportSession(
-            asset: composition,
-            presetName: AVAssetExportPresetHighestQuality
-        ) else {
-            throw NSError(domain: "PiPPlaceholder", code: 6, userInfo: [
-                NSLocalizedDescriptionKey: "Unable to create export session for placeholder asset."
-            ])
-        }
-
-        exportSession.outputURL = outputURL
-        exportSession.outputFileType = .mp4
-        exportSession.shouldOptimizeForNetworkUse = false
-
-        await withCheckedContinuation { continuation in
-            exportSession.exportAsynchronously {
-                continuation.resume()
-            }
-        }
-
-        if exportSession.status != .completed {
-            throw exportSession.error ?? NSError(domain: "PiPPlaceholder", code: 7, userInfo: [
-                NSLocalizedDescriptionKey: "Merged placeholder export failed."
-            ])
+        session.outputURL = outputURL
+        session.outputFileType = .mp4
+        await withCheckedContinuation { c in session.exportAsynchronously { c.resume() } }
+        if session.status != .completed {
+            throw session.error ?? NSError(domain: "PiP", code: 6)
         }
     }
 
-    private func makePixelBuffer(width: Int, height: Int, snapshot: PiPStatusSnapshot) -> CVPixelBuffer? {
+    private func makeStatusFrame(width: Int, height: Int) -> CVPixelBuffer? {
         var pixelBuffer: CVPixelBuffer?
-        let attributes: [String: Any] = [
-            kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
-        ]
-
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            width,
-            height,
-            kCVPixelFormatType_32ARGB,
-            attributes as CFDictionary,
-            &pixelBuffer
-        )
-
-        guard status == kCVReturnSuccess, let buffer = pixelBuffer else { return nil }
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32ARGB,
+                            [kCVPixelBufferCGImageCompatibilityKey as String: true,
+                             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true] as CFDictionary,
+                            &pixelBuffer)
+        guard let buffer = pixelBuffer else { return nil }
 
         CVPixelBufferLockBaseAddress(buffer, [])
-        if let baseAddress = CVPixelBufferGetBaseAddress(buffer) {
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-            if let context = CGContext(
-                data: baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-                space: colorSpace,
-                bitmapInfo: bitmapInfo
-            ) {
-                let background = UIColor(red: 0.06, green: 0.10, blue: 0.16, alpha: 1.0)
-                context.setFillColor(background.cgColor)
-                context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
 
-                context.translateBy(x: 0, y: CGFloat(height))
-                context.scaleBy(x: 1.0, y: -1.0)
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let ctx = CGContext(data: base, width: width, height: height, bitsPerComponent: 8,
+                                  bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                                  space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
 
-                let title = snapshot.lastAlert.isEmpty ? "IRL Alert Active" : snapshot.lastAlert
-                let connectionText = snapshot.isConnected ? "Connected" : "Disconnected"
-                let subtitle = "\(connectionText) • Queue \(snapshot.queueCount)"
+        // Dark background
+        ctx.setFillColor(UIColor(red: 0.06, green: 0.10, blue: 0.16, alpha: 1.0).cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
-                let dotColor = snapshot.isConnected ? UIColor.systemGreen : UIColor.systemRed
-                context.setFillColor(dotColor.cgColor)
-                context.fillEllipse(in: CGRect(x: 16, y: 16, width: 10, height: 10))
+        // Flip for text drawing
+        ctx.translateBy(x: 0, y: CGFloat(height))
+        ctx.scaleBy(x: 1.0, y: -1.0)
 
-                let paragraph = NSMutableParagraphStyle()
-                paragraph.alignment = .center
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
 
-                let titleAttributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.boldSystemFont(ofSize: 20),
-                    .foregroundColor: UIColor.white,
-                    .paragraphStyle: paragraph
-                ]
+        // Connection dot
+        let dotColor = statusSnapshot.isConnected ? UIColor.systemGreen : UIColor.systemRed
+        ctx.setFillColor(dotColor.cgColor)
+        ctx.fillEllipse(in: CGRect(x: 16, y: 16, width: 10, height: 10))
 
-                let subtitleAttributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 12),
-                    .foregroundColor: UIColor.white.withAlphaComponent(0.75),
-                    .paragraphStyle: paragraph
-                ]
+        // Title
+        let title = statusSnapshot.lastAlert.isEmpty ? "IRL Alert Active" : statusSnapshot.lastAlert
+        title.draw(in: CGRect(x: 0, y: CGFloat(height) * 0.45, width: CGFloat(width), height: 24),
+                   withAttributes: [.font: UIFont.boldSystemFont(ofSize: 20), .foregroundColor: UIColor.white, .paragraphStyle: paragraph])
 
-                let titleRect = CGRect(x: 0, y: CGFloat(height) * 0.45, width: CGFloat(width), height: 24)
-                let subtitleRect = CGRect(x: 0, y: CGFloat(height) * 0.45 + 24, width: CGFloat(width), height: 18)
-
-                title.draw(in: titleRect, withAttributes: titleAttributes)
-                subtitle.draw(in: subtitleRect, withAttributes: subtitleAttributes)
-            }
-        }
-        CVPixelBufferUnlockBaseAddress(buffer, [])
+        // Subtitle
+        let connectionText = statusSnapshot.isConnected ? "Connected" : "Disconnected"
+        let subtitle = "\(connectionText) • Queue \(statusSnapshot.queueCount)"
+        subtitle.draw(in: CGRect(x: 0, y: CGFloat(height) * 0.45 + 24, width: CGFloat(width), height: 18),
+                      withAttributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.white.withAlphaComponent(0.75), .paragraphStyle: paragraph])
 
         return buffer
     }
 
-    private func refreshDebugState() {
-        isSupported = AVPictureInPictureController.isPictureInPictureSupported()
-        hasAttachedPlayerViewController = playerViewController != nil
-        isHostViewInWindow = hasHostWindowLikeAttachment()
-        hasPiPController = pipController != nil
-        if pipController == nil {
-            pipControllerBindingDescription = "none"
-        }
-        hasAttachedPlayerLayer = playerLayer != nil
-        isReadyForDisplay = playerLayer?.isReadyForDisplay ?? false
-        if let boundLayer = pipBoundSourceLayer ?? playerLayer {
-            let stability = layerStabilityComponents(boundLayer)
-            isBoundLayerInHierarchy = stability.inHierarchy
-            isBoundLayerSized = stability.hasSize
-            isBoundLayerStable = stability.inHierarchy && stability.hasSize
-            boundLayerAspectDescription = aspectDescription(for: boundLayer.bounds)
-        } else {
-            isBoundLayerInHierarchy = false
-            isBoundLayerSized = false
-            isBoundLayerStable = false
-            boundLayerAspectDescription = "missing"
-        }
-        isPossible = pipController?.isPictureInPicturePossible ?? false
-        if let item = player?.currentItem {
-            switch item.status {
-            case .unknown:
-                itemStatusDescription = "unknown"
-            case .readyToPlay:
-                itemStatusDescription = "ready"
-            case .failed:
-                itemStatusDescription = "failed"
-            @unknown default:
-                itemStatusDescription = "unknown"
-            }
-            let hasVideoTrack = item.tracks.contains { $0.assetTrack?.mediaType == .video }
-            itemHasVideoTrackDescription = hasVideoTrack ? "yes" : "no"
-            let presentationSize = item.presentationSize
-            if presentationSize.width > 0, presentationSize.height > 0 {
-                itemPresentationDescription = "\(Int(presentationSize.width.rounded()))x\(Int(presentationSize.height.rounded()))"
-            } else {
-                itemPresentationDescription = "missing"
-            }
-        } else {
-            itemStatusDescription = "missing"
-            itemHasVideoTrackDescription = "missing"
-            itemPresentationDescription = "missing"
-        }
+    // MARK: - Helpers
 
-        if let player {
-            switch player.timeControlStatus {
-            case .paused:
-                timeControlDescription = "paused"
-            case .waitingToPlayAtSpecifiedRate:
-                timeControlDescription = "waiting"
-            case .playing:
-                timeControlDescription = "playing"
-            @unknown default:
-                timeControlDescription = "unknown"
-            }
-        } else {
-            timeControlDescription = "missing"
-        }
-
-        let audioSession = AVAudioSession.sharedInstance()
-        let audioActive = AudioSessionManager.shared.isSessionActive
-        audioSessionStateDescription = "cat:\(audioSession.category.rawValue) mode:\(audioSession.mode.rawValue) active:\(yesNo(audioActive))"
-        forceStartArmedDescription = forceStartOverridePending ? "yes" : "no"
-    }
-
-    private func yesNo(_ value: Bool) -> String {
-        value ? "yes" : "no"
-    }
-
-    private func hasHostWindowLikeAttachment() -> Bool {
-        if let playerViewController {
-            return playerViewController.view.window != nil
-        }
-        return playerLayer?.superlayer != nil
-    }
-
-    private func aspectDescription(for bounds: CGRect) -> String {
-        guard bounds.height > 0 else { return "missing" }
-        let ratio = bounds.width / bounds.height
-        return String(format: "%.2f", ratio)
+    private func findActiveWindow() -> UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
     }
 }
 
+// MARK: - AVPictureInPictureControllerDelegate
+
 extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
-    func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+
+    func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = true
-        forceStartNoCallbackTask?.cancel()
-        forceStartNoCallbackTask = nil
-        forceStartOverridePending = false
-        forceStartArmedDescription = "no"
-        lastDelegateEventDescription = "will-start"
-        lastFailureReason = "none"
-        refreshDebugState()
         logger.info("PiP starting.")
-        Task { await RelayClient.shared.updatePresence(directConnectionActive: true) }
+        Task { @MainActor in await RelayClient.shared.updatePresence(directConnectionActive: true) }
     }
 
-    func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        lastDelegateEventDescription = "will-stop"
+    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
         logger.info("PiP stopping.")
     }
 
-    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
         isActive = false
-        lastDelegateEventDescription = "did-stop"
-        refreshDebugState()
         logger.info("PiP stopped.")
-        Task { await RelayClient.shared.updatePresence(directConnectionActive: UIApplication.shared.applicationState == .active) }
+        Task { @MainActor in await RelayClient.shared.updatePresence(directConnectionActive: UIApplication.shared.applicationState == .active) }
     }
 
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        forceStartNoCallbackTask?.cancel()
-        forceStartNoCallbackTask = nil
-        forceStartOverridePending = false
-        forceStartArmedDescription = "no"
-        lastDelegateEventDescription = "failed-start"
-        let nsError = error as NSError
-        lastFailureReason = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
-        queueDeferredStart(source: lastStartAttemptSource)
-        refreshDebugState()
-        logger.error("PiP failed to start: \(error.localizedDescription)")
+    func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        let nsErr = error as NSError
+        logger.error("PiP failed to start: \(nsErr.domain) (\(nsErr.code)): \(nsErr.localizedDescription)")
     }
 }

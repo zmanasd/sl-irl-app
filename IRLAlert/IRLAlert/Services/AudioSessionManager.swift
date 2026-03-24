@@ -33,15 +33,7 @@ final class AudioSessionManager: ObservableObject {
         )
     }
 
-    /// Configure a stricter playback profile for PiP baseline diagnostics.
-    func configureSessionForPiPBaseline() {
-        configureAndActivateSession(
-            category: .playback,
-            mode: .moviePlayback,
-            options: [],
-            logLabel: "category=playback, mode=moviePlayback"
-        )
-    }
+
 
     private func configureAndActivateSession(
         category: AVAudioSession.Category,
