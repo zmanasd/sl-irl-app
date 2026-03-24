@@ -63,38 +63,44 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
 
-        // Attach the player layer to the UIKit window via PiPWindowHelper
-        guard let window = findActiveWindow() else {
-            logger.warning("No UIWindow available yet. Will retry shortly.")
+        // Find the active UIWindowScene (not just any UIWindow)
+        guard let scene = findActiveWindowScene() else {
+            logger.warning("No UIWindowScene available yet. Will retry shortly.")
             scheduleDeferredSetup()
             return
         }
 
-        PiPWindowHelper.shared.attach(to: window, player: player)
+        // Host the player in a dedicated off-screen UIWindow within this scene
+        PiPWindowHelper.shared.attach(player: player, to: scene)
 
-        guard let layer = PiPWindowHelper.shared.attachedLayer else {
-            logger.error("PiPWindowHelper failed to create player layer.")
+        guard let pvc = PiPWindowHelper.shared.hostedPlayerViewController else {
+            logger.error("PiPWindowHelper failed to create AVPlayerViewController.")
             return
         }
 
-        // Create the PiP controller bound to the UIKit-hosted layer
-        let controller = AVPictureInPictureController(playerLayer: layer)
-        controller?.delegate = self
-        controller?.canStartPictureInPictureAutomaticallyFromInline = true
-        pipController = controller
+        // AVPlayerViewController exposes its playerLayer directly
+        let playerLayer = pvc.playerLayer
 
-        // Observe eligibility
-        pipPossibleObservation = controller!.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observed, _ in
+        let pip = AVPictureInPictureController(playerLayer: playerLayer)
+        pip?.delegate = self
+        pip?.canStartPictureInPictureAutomaticallyFromInline = true
+        pipController = pip
+
+        observePiPController(pip)
+        player.play()
+        didSetup = true
+        logger.info("PiP setup complete — bound to AVPlayerViewController.playerLayer in off-screen UIWindow.")
+    }
+
+    private func observePiPController(_ controller: AVPictureInPictureController?) {
+        guard let controller else { return }
+        pipPossibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observed, _ in
             let possible = observed.isPictureInPicturePossible
             Task { @MainActor in
                 self?.isPossible = possible
                 self?.logger.info("PiP possible: \(possible)")
             }
         }
-
-        player.play()
-        didSetup = true
-        logger.info("PiP setup complete. Waiting for eligibility.")
     }
 
     /// Retry setup after a short delay (window may not be ready yet on initial SwiftUI appearance).
@@ -410,11 +416,10 @@ final class PiPManager: NSObject, ObservableObject {
 
     // MARK: - Helpers
 
-    private func findActiveWindow() -> UIWindow? {
+    private func findActiveWindowScene() -> UIWindowScene? {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }
+            .first { $0.activationState == .foregroundActive }
     }
 }
 
