@@ -15,17 +15,19 @@ final class NavigationRouter: ObservableObject {
     /// The currently selected tab in the main tab bar.
     enum Tab: Int, CaseIterable, Identifiable {
         case dashboard = 0
-        case alerts = 1
+        case connections = 1
         case testing = 2
-        case settings = 3
+        case alerts = 3
+        case settings = 4
 
         var id: Int { rawValue }
 
         var title: String {
             switch self {
             case .dashboard: return "Home"
-            case .alerts:    return "Alerts"
+            case .connections: return "Devices"
             case .testing:   return "Testing"
+            case .alerts:    return "Alerts"
             case .settings:  return "Settings"
             }
         }
@@ -33,8 +35,9 @@ final class NavigationRouter: ObservableObject {
         var iconName: String {
             switch self {
             case .dashboard: return "house.fill"
-            case .alerts:    return "bolt.fill"
+            case .connections: return "cable.connector.horizontal"
             case .testing:   return "flask.fill"
+            case .alerts:    return "bolt.fill"
             case .settings:  return "gearshape.fill"
             }
         }

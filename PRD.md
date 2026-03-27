@@ -69,18 +69,45 @@ IRL streaming frequently involves unreliable mobile data connections. The app mu
 ## 5. Technical Approach & Constraints
 
 ### 5.1. Platform Architecture
-- **Decision:** The project will be developed as a Native iOS app using **Swift / SwiftUI**.
-- **Rationale:** The core requirement of maintaining active WebSocket connections and uninterrupted audio mixing in the background is rigorously restricted by iOS. Cross-platform frameworks like React Native or Flutter frequently experience background thread suspension (meaning their JavaScript/Dart runtimes are paused by the OS) unless carefully bridged to custom native modules. Since the MVP is exclusively iOS-focused, building natively in Swift provides direct, unhindered access to `AVAudioSession` and Apple's background execution APIs without the liability of maintaining complex native bridges.
+- **Decision:** The project will be developed as a Native iOS app using **Swift / SwiftUI**, supported by a lightweight **backend relay server** (Node.js).
+- **Rationale:** The core requirement of maintaining active WebSocket connections and uninterrupted audio mixing in the background is rigorously restricted by iOS. Cross-platform frameworks like React Native or Flutter frequently experience background thread suspension (meaning their JavaScript/Dart runtimes are paused by the OS) unless carefully bridged to custom native modules. Since the MVP is exclusively iOS-focused, building natively in Swift provides direct, unhindered access to `AVAudioSession`, `AVPictureInPictureController`, and Apple's background execution APIs without the liability of maintaining complex native bridges.
 - A Progressive Web App (PWA) or simple web page will **not** fulfill the strict iOS background execution requirements.
 
-### 5.2. Audio Session Management (iOS specifics)
-- The app must configure its `AVAudioSession` with category `.playback` and option `.mixWithOthers`. This ensures the OS allows the app's sounds to play seamlessly over the primary streaming app without taking exclusive ownership of the audio hardware.
-- A silent audio loop may be required to keep the app's audio session active and prevent iOS from suspending the process during idle periods between alerts.
+### 5.2. Background Execution Strategy (iOS specifics)
+
+> **⚠️ Critical iOS Constraint:** iOS aggressively suspends apps within ~30 seconds of entering the background, killing WebSocket connections and halting code execution. A silent audio loop to prevent suspension **violates App Store Guideline 2.5.4** ("Playing a blank audio file to keep your app running in the background is not permitted") and will result in App Store rejection.
+
+The app uses a **layered degradation strategy** to maintain alert delivery across all app states:
+
+**Layer 1 — Foreground (lowest latency):**
+- Native WebSocket (`URLSessionWebSocketTask`) connects directly to alert services.
+- Alerts are queued and played immediately via `AVAudioSession` (`.playback`, `.mixWithOthers`).
+
+**Layer 2 — Picture-in-Picture (background with process alive):**
+- When the app enters the background, it transitions to a small floating PiP window showing the latest alert or a mini status dashboard.
+- iOS grants full background execution to apps displaying PiP content. The WebSocket stays alive and audio plays normally.
+- This is the primary background execution mechanism and is **App Store compliant** when PiP displays meaningful visual content.
+
+**Layer 3 — Push Notification Fallback (deep background / terminated):**
+- If PiP is dismissed or the app is terminated, a backend relay server maintains WebSocket connections on behalf of the user.
+- When an alert arrives, the server sends a high-priority Apple Push Notification (APNs) to the device.
+- A Notification Service Extension intercepts the push and plays the alert sound.
+
+### 5.3. Backend Relay Server
+- A lightweight Node.js server maintains persistent WebSocket connections to Streamlabs, StreamElements, Twitch EventSub, and SoundAlerts on behalf of each registered user.
+- When an alert event is received, the server forwards it as a high-priority APNs payload to the user's device.
+- The server only activates as a fallback when the iOS app's direct WebSocket (Layer 1/2) is not active.
+- **Hosting:** Fly.io (recommended) — ~$2–7/month at launch scale. See Implementation Plan for full cost pathway.
+
+### 5.4. Audio Session Management
+- The app configures its `AVAudioSession` with category `.playback` and option `.mixWithOthers`. This ensures the OS allows the app's sounds to play seamlessly over the primary streaming app without taking exclusive ownership of the audio hardware.
+- Audio is only played when there is actual alert content to deliver — no silent loops or blank audio files.
 
 ## 6. Out of Scope for MVP (V1)
 - **Android support** — iOS is the primary target; Android may follow in a future version.
-- **On-screen overlay rendering** — This app is an audio companion, not a visual overlay on the camera/stream feed.
+- **On-screen overlay rendering** — This app is an audio companion, not a visual overlay on the camera/stream feed. (Note: The PiP window is a small status indicator, not a stream overlay.)
 - Custom CSS injection/editing for Browser Source URLs directly in-app.
 - Video streaming capabilities (this app operates strictly as an alert relayer companion).
 - Custom alert media uploads.
 - Advanced wearable integrations (e.g., Apple Watch companion app).
+
