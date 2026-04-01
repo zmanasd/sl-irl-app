@@ -4,67 +4,71 @@ import UIKit
 import os.log
 
 /// Creates a dedicated off-screen UIWindow that hosts an AVPlayerViewController
-/// as a proper child view controller, enabling AVKit's PiP scene discovery.
+/// as a proper child view controller, enabling AVKit's built-in PiP support.
 ///
-/// A 1×1 hidden AVPlayerLayer sublayer is insufficient — AVKit requires the
-/// player to be presented via a full view controller hierarchy in a real
-/// UIWindowScene. This matches the exact structure used in the minimal UIKit
-/// test app that confirmed PiP works.
+/// AVPlayerViewController handles Picture-in-Picture internally when:
+///   - `allowsPictureInPicturePlayback = true`
+///   - `canStartPictureInPictureAutomaticallyFromInline = true`
+///   - The VC is in a live UIWindowScene (not a SwiftUI hosting hierarchy)
+///
+/// The window is placed off-screen (at -200,-200) with near-zero alpha so it
+/// is "visible" to AVKit but invisible to the user.
 @MainActor
-final class PiPWindowHelper {
+final class PiPWindowHelper: NSObject {
 
     static let shared = PiPWindowHelper()
-    private init() {}
+    private override init() { super.init() }
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPWindowHelper")
 
     private var pipWindow: UIWindow?
-    private var playerViewController: AVPlayerViewController?
+    private(set) var playerViewController: AVPlayerViewController?
 
     // MARK: - Public
 
-    /// The player view controller whose playerLayer backs the PiP controller.
-    var hostedPlayerViewController: AVPlayerViewController? { playerViewController }
-
-    /// Whether the window and VC are properly set up.
     var isAttached: Bool { pipWindow != nil && playerViewController != nil }
 
-    /// Create the off-screen PiP window and host the player VC inside it.
-    /// Must be called after a UIWindowScene is available.
+    /// Set up the off-screen UIWindow + AVPlayerViewController.
+    /// `player` must already have an item ready to play.
     func attach(player: AVPlayer, to scene: UIWindowScene) {
         guard pipWindow == nil else {
             logger.info("PiP window already attached.")
             return
         }
 
-        // Build AVPlayerViewController — the exact same way the working test app does it
+        // Root VC container for the player VC
+        let rootVC = UIViewController()
+        rootVC.view.backgroundColor = .clear
+
+        // AVPlayerViewController with PiP enabled
         let pvc = AVPlayerViewController()
         pvc.player = player
         pvc.allowsPictureInPicturePlayback = true
         pvc.canStartPictureInPictureAutomaticallyFromInline = true
-        playerViewController = pvc
+        pvc.updatesNowPlayingInfoCenter = false
 
-        // Minimal root VC to hold the player VC as a child
-        let rootVC = UIViewController()
         rootVC.addChild(pvc)
-        pvc.view.frame = CGRect(x: 0, y: 0, width: 100, height: 100)  // non-zero size required
+        pvc.view.frame = CGRect(x: 0, y: 0, width: 100, height: 56) // 16:9 non-zero frame
+        pvc.view.backgroundColor = .black
         rootVC.view.addSubview(pvc.view)
         pvc.didMove(toParent: rootVC)
+        playerViewController = pvc
 
-        // Create a separate UIWindow in the same scene, placed off-screen
+        // Off-screen window — must NOT be hidden for AVKit to detect it
         let window = UIWindow(windowScene: scene)
         window.rootViewController = rootVC
-        window.frame = CGRect(x: -200, y: -200, width: 100, height: 100)  // off-screen
-        window.windowLevel = .normal - 1  // below all other content
-        window.isHidden = false  // must be visible (not hidden) for AVKit eligibility
-        window.alpha = 0.01      // nearly invisible but not hidden
+        window.frame = CGRect(x: -200, y: -200, width: 100, height: 56)
+        window.windowLevel = .normal - 1
+        window.isHidden = false
+        window.alpha = 0.01 // nearly invisible but technically "visible"
         window.makeKeyAndVisible()
         pipWindow = window
 
-        logger.info("PiP window attached — AVPlayerViewController hosted in off-screen UIWindowScene window.")
+        logger.info("PiP off-screen window ready. Player: \(player.currentItem != nil ? "has item" : "no item")")
     }
 
     func detach() {
+        playerViewController?.player = nil
         playerViewController?.willMove(toParent: nil)
         playerViewController?.view.removeFromSuperview()
         playerViewController?.removeFromParent()
@@ -72,5 +76,17 @@ final class PiPWindowHelper {
         pipWindow?.isHidden = true
         pipWindow = nil
         logger.info("PiP window detached.")
+    }
+}
+
+// MARK: - AVPlayerViewControllerDelegate
+
+extension PiPWindowHelper: AVPlayerViewControllerDelegate {
+    nonisolated func playerViewControllerDidStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
+        Task { @MainActor in PiPWindowHelper.shared.logger.info("PiP started via AVPlayerViewController.") }
+    }
+
+    nonisolated func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
+        Task { @MainActor in PiPWindowHelper.shared.logger.info("PiP stopped via AVPlayerViewController.") }
     }
 }

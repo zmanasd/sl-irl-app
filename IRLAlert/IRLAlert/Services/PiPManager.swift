@@ -6,9 +6,9 @@ import os.log
 
 /// Manages Picture-in-Picture lifecycle for background execution.
 ///
-/// Uses `PiPWindowHelper` to host the AVPlayerLayer directly in the UIKit
-/// window hierarchy (not via SwiftUI), which is required for AVKit's
-/// internal scene discovery to mark PiP as eligible.
+/// Uses `PiPWindowHelper` to host an `AVPlayerViewController` in a dedicated
+/// off-screen `UIWindow`. `AVPlayerViewController` handles PiP internally —
+/// no separate `AVPictureInPictureController` is needed.
 @MainActor
 final class PiPManager: NSObject, ObservableObject {
 
@@ -18,15 +18,12 @@ final class PiPManager: NSObject, ObservableObject {
 
     @Published private(set) var isActive: Bool = false
     @Published private(set) var isSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
-    @Published private(set) var isPossible: Bool = false
 
     // MARK: - Private
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PiPManager")
-    private var pipController: AVPictureInPictureController?
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
-    private var pipPossibleObservation: NSKeyValueObservation?
     private var playerTimeControlObservation: NSKeyValueObservation?
     private var playerItemStatusObservation: NSKeyValueObservation?
     private var didSetup = false
@@ -46,7 +43,7 @@ final class PiPManager: NSObject, ObservableObject {
 
     // MARK: - Public API
 
-    /// Set up the PiP pipeline. Call once after the UIWindow is available.
+    /// Set up the PiP pipeline. Call after the app appears on screen.
     func setup() {
         guard !didSetup else { return }
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
@@ -63,68 +60,37 @@ final class PiPManager: NSObject, ObservableObject {
             return
         }
 
-        // Find the active UIWindowScene (not just any UIWindow)
         guard let scene = findActiveWindowScene() else {
-            logger.warning("No UIWindowScene available yet. Will retry shortly.")
+            logger.warning("No foreground UIWindowScene yet — will retry.")
             scheduleDeferredSetup()
             return
         }
 
-        // Host the player in a dedicated off-screen UIWindow within this scene
+        // Host AVPlayerViewController in a dedicated off-screen UIWindow.
+        // AVPlayerViewController manages PiP automatically when its properties are set.
         PiPWindowHelper.shared.attach(player: player, to: scene)
 
-        guard let pvc = PiPWindowHelper.shared.hostedPlayerViewController else {
+        guard let pvc = PiPWindowHelper.shared.playerViewController else {
             logger.error("PiPWindowHelper failed to create AVPlayerViewController.")
             return
         }
 
-        // AVPlayerViewController exposes its playerLayer directly
-        let playerLayer = pvc.playerLayer
+        pvc.delegate = PiPWindowHelper.shared
 
-        let pip = AVPictureInPictureController(playerLayer: playerLayer)
-        pip?.delegate = self
-        pip?.canStartPictureInPictureAutomaticallyFromInline = true
-        pipController = pip
-
-        observePiPController(pip)
         player.play()
         didSetup = true
-        logger.info("PiP setup complete — bound to AVPlayerViewController.playerLayer in off-screen UIWindow.")
+        logger.info("PiP setup complete — AVPlayerViewController in off-screen UIWindow.")
     }
 
-    private func observePiPController(_ controller: AVPictureInPictureController?) {
-        guard let controller else { return }
-        pipPossibleObservation = controller.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] observed, _ in
-            let possible = observed.isPictureInPicturePossible
-            Task { @MainActor in
-                self?.isPossible = possible
-                self?.logger.info("PiP possible: \(possible)")
-            }
-        }
-    }
-
-    /// Retry setup after a short delay (window may not be ready yet on initial SwiftUI appearance).
-    private func scheduleDeferredSetup() {
-        guard setupRetryCount < 5 else {
-            logger.error("PiP setup failed: no UIWindow available after 5 retries.")
-            return
-        }
-        setupRetryCount += 1
-        setupRetryTask?.cancel()
-        setupRetryTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-            self?.didSetup = false
-            self?.setup()
-        }
-    }
-
-    /// Stop PiP if it's currently active (e.g. when returning to foreground).
+    /// Stop PiP when returning to foreground.
     func stopIfActive() {
-        guard let pipController, pipController.isPictureInPictureActive else { return }
-        pipController.stopPictureInPicture()
+        guard isActive else { return }
+        // AVPlayerViewController's delegate tracks isActive; let the system handle dismissal
+        // when app becomes foreground active. No manual stop needed — system dismisses PiP.
+        logger.info("stopIfActive called — PiP will dismiss as app enters foreground.")
     }
 
-    /// Update the PiP status content (used for placeholder frame rendering).
+    /// Update the status content shown in the PiP placeholder frame.
     func updateStatus(lastAlert: String? = nil, isConnected: Bool? = nil, queueCount: Int? = nil) {
         if let lastAlert, !lastAlert.isEmpty { statusSnapshot.lastAlert = lastAlert }
         if let isConnected { statusSnapshot.isConnected = isConnected }
@@ -160,16 +126,14 @@ final class PiPManager: NSObject, ObservableObject {
     }
 
     private func makePlayerItem() -> AVPlayerItem? {
-        // Try bundled clip first
         if let bundled = Bundle.main.url(forResource: "pip_baseline", withExtension: "mp4") {
             return AVPlayerItem(url: bundled)
         }
-        // Try cached generated placeholder
         if let cached = placeholderFileURL(), FileManager.default.fileExists(atPath: cached.path) {
             return AVPlayerItem(url: cached)
         }
-        // Generate placeholder in background, use remote fallback for now
         generatePlaceholderAsync()
+        // Remote fallback while placeholder is being generated
         let remoteURL = URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")!
         return AVPlayerItem(url: remoteURL)
     }
@@ -180,7 +144,7 @@ final class PiPManager: NSObject, ObservableObject {
         playerTimeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor in
                 if observed.timeControlStatus == .playing {
-                    self?.logger.debug("Player time control: playing")
+                    self?.logger.debug("Player playing.")
                 }
             }
         }
@@ -204,6 +168,22 @@ final class PiPManager: NSObject, ObservableObject {
     @objc private func loopPlayerItem() {
         player?.seek(to: .zero)
         player?.play()
+    }
+
+    // MARK: - Deferred Setup
+
+    private func scheduleDeferredSetup() {
+        guard setupRetryCount < 5 else {
+            logger.error("PiP setup failed: no UIWindowScene available after 5 retries.")
+            return
+        }
+        setupRetryCount += 1
+        setupRetryTask?.cancel()
+        setupRetryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self?.didSetup = false
+            self?.setup()
+        }
     }
 
     // MARK: - Placeholder Video Generation
@@ -262,7 +242,6 @@ final class PiPManager: NSObject, ObservableObject {
         let fps: Int32 = 30
 
         do {
-            // Generate video track
             let tempVideoURL = url.deletingLastPathComponent().appendingPathComponent("pip_temp_video.mp4")
             let tempAudioURL = url.deletingLastPathComponent().appendingPathComponent("pip_temp_audio.caf")
             try? FileManager.default.removeItem(at: tempVideoURL)
@@ -305,7 +284,7 @@ final class PiPManager: NSObject, ObservableObject {
         writer.startWriting()
         writer.startSession(atSourceTime: .zero)
 
-        let frameCount = fps  // 1 second
+        let frameCount = fps
         for frame in 0..<frameCount {
             while !input.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 5_000_000)
@@ -384,28 +363,22 @@ final class PiPManager: NSObject, ObservableObject {
                                   bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
                                   space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
 
-        // Dark background
         ctx.setFillColor(UIColor(red: 0.06, green: 0.10, blue: 0.16, alpha: 1.0).cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-        // Flip for text drawing
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1.0, y: -1.0)
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
 
-        // Connection dot
         let dotColor = statusSnapshot.isConnected ? UIColor.systemGreen : UIColor.systemRed
         ctx.setFillColor(dotColor.cgColor)
         ctx.fillEllipse(in: CGRect(x: 16, y: 16, width: 10, height: 10))
 
-        // Title
         let title = statusSnapshot.lastAlert.isEmpty ? "IRL Alert Active" : statusSnapshot.lastAlert
         title.draw(in: CGRect(x: 0, y: CGFloat(height) * 0.45, width: CGFloat(width), height: 24),
                    withAttributes: [.font: UIFont.boldSystemFont(ofSize: 20), .foregroundColor: UIColor.white, .paragraphStyle: paragraph])
 
-        // Subtitle
         let connectionText = statusSnapshot.isConnected ? "Connected" : "Disconnected"
         let subtitle = "\(connectionText) • Queue \(statusSnapshot.queueCount)"
         subtitle.draw(in: CGRect(x: 0, y: CGFloat(height) * 0.45 + 24, width: CGFloat(width), height: 18),
@@ -420,31 +393,5 @@ final class PiPManager: NSObject, ObservableObject {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
-    }
-}
-
-// MARK: - AVPictureInPictureControllerDelegate
-
-extension PiPManager: @preconcurrency AVPictureInPictureControllerDelegate {
-
-    func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
-        isActive = true
-        logger.info("PiP starting.")
-        Task { @MainActor in await RelayClient.shared.updatePresence(directConnectionActive: true) }
-    }
-
-    func pictureInPictureControllerWillStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        logger.info("PiP stopping.")
-    }
-
-    func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-        isActive = false
-        logger.info("PiP stopped.")
-        Task { @MainActor in await RelayClient.shared.updatePresence(directConnectionActive: UIApplication.shared.applicationState == .active) }
-    }
-
-    func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        let nsErr = error as NSError
-        logger.error("PiP failed to start: \(nsErr.domain) (\(nsErr.code)): \(nsErr.localizedDescription)")
     }
 }
