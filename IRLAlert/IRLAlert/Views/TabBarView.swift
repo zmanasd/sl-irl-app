@@ -11,10 +11,12 @@ struct TabBarView: View {
                 switch router.selectedTab {
                 case .dashboard:
                     DashboardView()
-                case .alerts:
-                    EventLogView()
+                case .connections:
+                    ConnectionsView()
                 case .testing:
                     AlertTestingView()
+                case .alerts:
+                    EventLogView()
                 case .settings:
                     SettingsView()
                 }
@@ -47,11 +49,11 @@ struct CustomNavBar: View {
             ) { router.switchToTab(.dashboard) }
             
             NavBarItem(
-                tab: .alerts,
-                icon: "bolt.fill",
-                title: "Alerts",
-                isSelected: router.selectedTab == .alerts
-            ) { router.switchToTab(.alerts) }
+                tab: .connections,
+                icon: "cable.connector.horizontal",
+                title: "Devices",
+                isSelected: router.selectedTab == .connections
+            ) { router.switchToTab(.connections) }
             
             // Center Floating Action Button (Testing)
             Button {
@@ -59,9 +61,9 @@ struct CustomNavBar: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(DesignSystem.Colors.primary)
+                        .fill(DesignSystem.Colors.primaryBlue)
                         .frame(width: 56, height: 56)
-                        .shadow(color: DesignSystem.Colors.primary.opacity(0.4), radius: 12, x: 0, y: 6)
+                        .shadow(color: DesignSystem.Colors.primaryBlue.opacity(0.4), radius: 12, x: 0, y: 6)
                         .overlay(
                             Circle()
                                 .stroke(Color.appBackground, lineWidth: 4)
@@ -76,17 +78,20 @@ struct CustomNavBar: View {
             
             // Right tabs
             NavBarItem(
+                tab: .alerts,
+                icon: "bell.fill",
+                title: "Alerts",
+                isSelected: router.selectedTab == .alerts
+            ) { router.switchToTab(.alerts) }
+            
+            NavBarItem(
                 tab: .settings,
                 icon: "gearshape.fill",
-                title: "Setup",
+                title: "Settings",
                 isSelected: router.selectedTab == .settings
             ) { router.switchToTab(.settings) }
-            
-            // Placeholder for future Connections/Profile tab
-            Color.clear
-                .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 16)
         .padding(.top, 12)
         // Add safe area bottom padding manually to ensure it sits right on notch devices
         .padding(.bottom, UIApplication.shared.connectedScenes
