@@ -8,7 +8,7 @@ final class AlertTestingVM: ObservableObject {
     
     // MARK: - Published State
     
-    /// Whether at least one service is connected (ready to receive real alerts)
+    /// Whether the Twitch/APNs proof path is ready to validate.
     @Published private(set) var isReady = false
     
     /// Whether the queue is currently processing an alert
@@ -17,16 +17,15 @@ final class AlertTestingVM: ObservableObject {
     /// Current queue count
     @Published private(set) var queueCount = 0
     
-    /// Number of active connections
-    @Published private(set) var activeServiceCount = 0
-    
     /// Last test alert sent (for confirmation UI)
     @Published private(set) var lastTestAlert: AlertEvent?
     
     // MARK: - Dependencies
     
     private let queueManager = AlertQueueManager.shared
-    private let connectionManager = ConnectionManager.shared
+    private let settings = AppSettings.shared
+    private let pushManager = PushNotificationManager.shared
+    private let relayClient = RelayClient.shared
     private var cancellables = Set<AnyCancellable>()
     
     init() {
@@ -39,27 +38,16 @@ final class AlertTestingVM: ObservableObject {
     func sendTestAlert(type: AlertType) {
         let event: AlertEvent
         switch type {
-        case .donation:
-            event = .mockDonation(
-                username: "TestDonator",
-                amount: Double.random(in: 1...100),
-                message: "Test donation from IRL Alert!"
-            )
         case .follow:
             event = .mockFollow(username: "TestFollower")
         case .subscription:
             event = .mockSubscription(username: "TestSubscriber")
         case .bits:
             event = .mockBits(username: "TestBitsUser", bits: Int.random(in: 100...1000))
-        case .host:
-            event = AlertEvent(
-                type: .host,
-                username: "TestHost",
-                amount: Double(Int.random(in: 5...200)),
-                source: .mock
-            )
         case .raid:
             event = .mockRaid(username: "TestRaider", viewers: Int.random(in: 10...500))
+        case .channelPoints:
+            event = .mockChannelPoints(username: "TestRedeemer", reward: "Hydrate")
         }
         
         lastTestAlert = event
@@ -88,11 +76,19 @@ final class AlertTestingVM: ObservableObject {
     // MARK: - Bindings
     
     private func bindState() {
-        connectionManager.$hasActiveConnection
-            .assign(to: &$isReady)
-        
-        connectionManager.$activeServiceCount
-            .assign(to: &$activeServiceCount)
+        Publishers.CombineLatest4(
+            settings.$pushNotificationsEnabled,
+            pushManager.$deviceToken,
+            relayClient.$lastRegistrationStatusCode,
+            relayClient.$lastUserReadinessOk
+        )
+        .map { pushEnabled, deviceToken, statusCode, userReady in
+            pushEnabled
+                && deviceToken != nil
+                && statusCode.map { (200..<300).contains($0) } == true
+                && userReady
+        }
+        .assign(to: &$isReady)
         
         queueManager.$isProcessing
             .assign(to: &$isProcessing)

@@ -60,7 +60,6 @@ final class AlertQueueManager: ObservableObject {
         
         queue.append(event)
         queueCount = queue.count
-        PiPManager.shared.updateStatus(queueCount: queueCount)
         
         logger.info("Enqueued: \(event.type.rawValue) from \(event.username) (queue: \(self.queueCount))")
         
@@ -70,7 +69,7 @@ final class AlertQueueManager: ObservableObject {
         }
     }
     
-    /// Enqueue multiple events at once (e.g. batch from reconnection).
+    /// Enqueue multiple events at once (e.g. batch restoration).
     func enqueue(_ events: [AlertEvent]) {
         for event in events {
             enqueue(event)
@@ -82,7 +81,6 @@ final class AlertQueueManager: ObservableObject {
         let cleared = queue.count
         queue.removeAll()
         queueCount = 0
-        PiPManager.shared.updateStatus(queueCount: 0)
         logger.info("Queue cleared: \(cleared) alerts removed")
     }
     
@@ -100,7 +98,6 @@ final class AlertQueueManager: ObservableObject {
             isCurrentlyProcessing = false
             isProcessing = false
             currentAlert = nil
-            PiPManager.shared.updateStatus(queueCount: 0)
             logger.info("Queue empty — processing complete. Processed: \(self.processedCount), Skipped: \(self.skippedCount)")
             return
         }
@@ -111,10 +108,6 @@ final class AlertQueueManager: ObservableObject {
         let event = queue.removeFirst()
         queueCount = queue.count
         currentAlert = event
-        PiPManager.shared.updateStatus(
-            lastAlert: "\(event.type.displayName) • \(event.username)",
-            queueCount: queueCount
-        )
         
         logger.info("Processing: \(event.type.rawValue) from \(event.username)")
         

@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import UserNotifications
 
 /// ViewModel for the Settings screen.
 /// Binds AppSettings to the UI with additional logic for TTS voice selection.
@@ -17,9 +18,8 @@ final class SettingsVM: ObservableObject {
     @Published var hapticFeedbackEnabled: Bool
     @Published var queueOverflowThreshold: Int
     @Published var interAlertDelay: Double
-    @Published var disconnectNotificationTimeout: Double
-    @Published var pipEnabled: Bool
     @Published var pushNotificationsEnabled: Bool
+    @Published var relayBaseURL: String
     @Published var enabledAlertTypes: Set<AlertType>
     
     /// Available TTS voices for the picker
@@ -40,9 +40,8 @@ final class SettingsVM: ObservableObject {
         hapticFeedbackEnabled = settings.hapticFeedbackEnabled
         queueOverflowThreshold = settings.queueOverflowThreshold
         interAlertDelay = settings.interAlertDelay
-        disconnectNotificationTimeout = settings.disconnectNotificationTimeout
-        pipEnabled = settings.pipEnabled
         pushNotificationsEnabled = settings.pushNotificationsEnabled
+        relayBaseURL = settings.relayBaseURL
         enabledAlertTypes = settings.enabledAlertTypes
         
         loadAvailableVoices()
@@ -70,10 +69,97 @@ final class SettingsVM: ObservableObject {
         hapticFeedbackEnabled = true
         queueOverflowThreshold = 20
         interAlertDelay = 1.0
-        disconnectNotificationTimeout = 30.0
-        pipEnabled = false
         pushNotificationsEnabled = false
+        relayBaseURL = "http://localhost:3000"
         enabledAlertTypes = Set(AlertType.allCases)
+    }
+
+    /// Builds a secret-safe diagnostics snapshot for physical-device proof runs.
+    func diagnosticsSnapshot(
+        pushManager: PushNotificationManager = .shared,
+        relayClient: RelayClient = .shared,
+        generatedAt: Date = Date()
+    ) -> String {
+        let relayRegistrationStatus: String
+        if let error = relayClient.lastRegistrationError {
+            relayRegistrationStatus = error
+        } else if let statusCode = relayClient.lastRegistrationStatusCode {
+            relayRegistrationStatus = "HTTP \(statusCode)"
+        } else if relayClient.lastRegistrationAttemptAt != nil {
+            relayRegistrationStatus = "Pending"
+        } else {
+            relayRegistrationStatus = "Not attempted"
+        }
+
+        let relayTestStatus: String
+        if let error = relayClient.lastTestAlertError {
+            relayTestStatus = error
+        } else if let statusCode = relayClient.lastTestAlertStatusCode {
+            relayTestStatus = "HTTP \(statusCode)"
+        } else if relayClient.isSendingTestAlert {
+            relayTestStatus = "Sending"
+        } else {
+            relayTestStatus = "Not sent"
+        }
+
+        let relayDiagnosticsStatus: String
+        if let error = relayClient.lastDiagnosticsError {
+            relayDiagnosticsStatus = error
+        } else if let statusCode = relayClient.lastDiagnosticsStatusCode {
+            relayDiagnosticsStatus = "\(relayClient.lastDiagnosticsSummary) HTTP \(statusCode)"
+        } else if relayClient.isFetchingDiagnostics {
+            relayDiagnosticsStatus = "Fetching"
+        } else {
+            relayDiagnosticsStatus = relayClient.lastDiagnosticsSummary
+        }
+
+        let relayReadinessStatus: String
+        if let error = relayClient.lastReadinessError {
+            relayReadinessStatus = error
+        } else if let statusCode = relayClient.lastReadinessStatusCode {
+            relayReadinessStatus = "\(relayClient.lastUserReadinessSummary) HTTP \(statusCode)"
+        } else if relayClient.isFetchingReadiness {
+            relayReadinessStatus = "Fetching"
+        } else {
+            relayReadinessStatus = relayClient.lastUserReadinessSummary
+        }
+
+        return """
+        IRL Alert MVP Diagnostics
+        Generated At: \(isoString(generatedAt))
+        Relay URL: \(relayClient.diagnosticsBaseURL)
+        Relay User: \(shortIdentifier(settings.relayUserId))
+        Push Alerts Enabled: \(settings.pushNotificationsEnabled)
+        Push Permission: \(authorizationTitle(pushManager.authorizationStatus))
+        APNs Token: \(pushManager.deviceToken?.isEmpty == false ? "Available" : "Missing")
+        APNs Token Updated: \(isoString(pushManager.deviceTokenRegisteredAt))
+        APNs Registration Error: \(pushManager.lastRegistrationError ?? "None")
+        Push Receipts: \(pushManager.acceptedNotificationCount)/\(pushManager.receivedNotificationCount) accepted
+        Dropped Pushes: \(pushManager.droppedNotificationCount)
+        Last Received: \(isoString(pushManager.lastNotificationReceivedAt))
+        Last Correlation: \(pushManager.lastAcceptedAlert.map { shortIdentifier($0.externalIdentity) } ?? "None")
+        Last Drop: \(pushManager.lastDroppedAlertReason ?? "None")
+        Relay Register: \(relayRegistrationStatus)
+        Last Relay Test: \(relayTestStatus)
+        Last Relay Test Correlation: \(relayClient.lastTestAlertCorrelationId.map(shortIdentifier) ?? "None")
+        MVP Readiness: \(relayReadinessStatus)
+        MVP Readiness Fetched: \(isoString(relayClient.lastReadinessFetchedAt))
+        Relay Readiness: \(relayClient.lastReadinessSummary)
+        Relay Diagnostics: \(relayDiagnosticsStatus)
+        Relay Diagnostics Fetched: \(isoString(relayClient.lastDiagnosticsFetchedAt))
+        Relay Current User: \(relayClient.lastDiagnosticsHasCurrentUser ? "Present" : "Missing")
+        Relay Device Token: \(relayClient.lastDiagnosticsDeviceTokenStatus)
+        Relay APNs Readiness: \(relayClient.lastDiagnosticsApnsReadiness)
+        Twitch OAuth Readiness: \(relayClient.lastDiagnosticsTwitchOAuthReadiness)
+        Connector Recovery: \(relayClient.lastDiagnosticsConnectorRecoveryStatus)
+        Twitch Status: \(relayClient.lastDiagnosticsTwitchStatus)
+        Twitch Refresh: \(relayClient.lastDiagnosticsTwitchRefreshStatus)
+        Provider Dedupe: \(relayClient.lastDiagnosticsProviderDedupeStatus)
+        Relay Delivery: \(relayClient.lastDiagnosticsDeliveryStatus)
+        Twitch OAuth Start: \(relayClient.lastTwitchOAuthStatusCode.map { "HTTP \($0)" } ?? "Not attempted")
+        Twitch OAuth Started: \(isoString(relayClient.lastTwitchOAuthStartedAt))
+        Twitch OAuth Error: \(relayClient.lastTwitchOAuthError ?? "None")
+        """
     }
     
     // MARK: - Private Helpers
@@ -96,8 +182,6 @@ final class SettingsVM: ObservableObject {
         $hapticFeedbackEnabled.dropFirst().sink { [weak self] val in self?.settings.hapticFeedbackEnabled = val }.store(in: &cancellables)
         $queueOverflowThreshold.dropFirst().sink { [weak self] val in self?.settings.queueOverflowThreshold = val }.store(in: &cancellables)
         $interAlertDelay.dropFirst().sink { [weak self] val in self?.settings.interAlertDelay = val }.store(in: &cancellables)
-        $disconnectNotificationTimeout.dropFirst().sink { [weak self] val in self?.settings.disconnectNotificationTimeout = val }.store(in: &cancellables)
-        $pipEnabled.dropFirst().sink { [weak self] val in self?.settings.pipEnabled = val }.store(in: &cancellables)
         $pushNotificationsEnabled
             .dropFirst()
             .sink { [weak self] val in
@@ -105,6 +189,28 @@ final class SettingsVM: ObservableObject {
                 Task { await PushNotificationManager.shared.handleUserToggle(enabled: val) }
             }
             .store(in: &cancellables)
+        $relayBaseURL.dropFirst().sink { [weak self] val in self?.settings.relayBaseURL = val }.store(in: &cancellables)
         $enabledAlertTypes.dropFirst().sink { [weak self] val in self?.settings.enabledAlertTypes = val }.store(in: &cancellables)
+    }
+
+    private func authorizationTitle(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: "Not Asked"
+        case .denied: "Denied"
+        case .authorized: "Authorized"
+        case .provisional: "Provisional"
+        case .ephemeral: "Ephemeral"
+        @unknown default: "Unknown"
+        }
+    }
+
+    private func isoString(_ date: Date?) -> String {
+        guard let date else { return "Never" }
+        return ISO8601DateFormatter().string(from: date)
+    }
+
+    private func shortIdentifier(_ value: String) -> String {
+        guard value.count > 12 else { return value }
+        return "\(value.prefix(6))...\(value.suffix(6))"
     }
 }

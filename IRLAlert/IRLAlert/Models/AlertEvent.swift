@@ -4,6 +4,8 @@ import Foundation
 /// Created by service integrations, processed by AlertQueueManager, displayed in EventLogView.
 struct AlertEvent: Identifiable, Codable, Sendable {
     let id: UUID
+    let correlationId: String?
+    let providerMessageId: String?
     let type: AlertType
     let username: String
     let message: String?
@@ -15,15 +17,14 @@ struct AlertEvent: Identifiable, Codable, Sendable {
     
     /// Which streaming service produced this alert
     enum AlertSource: String, Codable, Sendable {
-        case streamlabs
-        case streamElements = "stream_elements"
         case twitchNative = "twitch_native"
-        case soundAlerts = "sound_alerts"
         case mock // For testing
     }
     
     init(
         id: UUID = UUID(),
+        correlationId: String? = nil,
+        providerMessageId: String? = nil,
         type: AlertType,
         username: String,
         message: String? = nil,
@@ -34,6 +35,8 @@ struct AlertEvent: Identifiable, Codable, Sendable {
         source: AlertSource
     ) {
         self.id = id
+        self.correlationId = correlationId
+        self.providerMessageId = providerMessageId
         self.type = type
         self.username = username
         self.message = message
@@ -43,17 +46,15 @@ struct AlertEvent: Identifiable, Codable, Sendable {
         self.timestamp = timestamp
         self.source = source
     }
+
+    /// Stable external identity used for relay/APNs dedupe and diagnostics.
+    var externalIdentity: String {
+        correlationId ?? providerMessageId ?? id.uuidString
+    }
     
     /// Generate a TTS string for this alert based on its type
     var ttsText: String {
         switch type {
-        case .donation:
-            let amountStr = formattedAmount ?? (amount.map { String(format: "$%.2f", $0) } ?? "")
-            if let message = message, !message.isEmpty {
-                return "\(username) donated \(amountStr). \(message)"
-            }
-            return "\(username) donated \(amountStr)"
-            
         case .subscription:
             return "\(username) just subscribed!"
             
@@ -64,32 +65,19 @@ struct AlertEvent: Identifiable, Codable, Sendable {
         case .follow:
             return "\(username) is now following"
             
-        case .host:
-            let viewerCount = amount.map { "\(Int($0))" } ?? "some"
-            return "\(username) is hosting with \(viewerCount) viewers"
-            
         case .raid:
             let viewerCount = amount.map { "\(Int($0))" } ?? "some"
             return "\(username) is raiding with \(viewerCount) viewers!"
+
+        case .channelPoints:
+            if let message = message, !message.isEmpty {
+                return "\(username) redeemed \(message)"
+            }
+            return "\(username) redeemed channel points"
         }
     }
     
     // MARK: - Mock Factories (for testing)
-    
-    static func mockDonation(
-        username: String = "TestUser",
-        amount: Double = 5.00,
-        message: String = "Great stream!"
-    ) -> AlertEvent {
-        AlertEvent(
-            type: .donation,
-            username: username,
-            message: message,
-            amount: amount,
-            formattedAmount: String(format: "$%.2f", amount),
-            source: .mock
-        )
-    }
     
     static func mockSubscription(username: String = "SubFan") -> AlertEvent {
         AlertEvent(type: .subscription, username: username, source: .mock)
@@ -115,5 +103,17 @@ struct AlertEvent: Identifiable, Codable, Sendable {
     
     static func mockFollow(username: String = "NewFollower") -> AlertEvent {
         AlertEvent(type: .follow, username: username, source: .mock)
+    }
+
+    static func mockChannelPoints(
+        username: String = "PointsRedeemer",
+        reward: String = "Highlight My Message"
+    ) -> AlertEvent {
+        AlertEvent(
+            type: .channelPoints,
+            username: username,
+            message: reward,
+            source: .mock
+        )
     }
 }

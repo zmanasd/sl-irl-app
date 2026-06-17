@@ -1,39 +1,66 @@
+import { pathToFileURL } from "node:url";
+
 const baseUrl = process.env.RELAY_BASE_URL ?? "http://localhost:3000";
 const userId = process.env.RELAY_USER_ID;
 
-if (!userId) {
-  console.error("Missing RELAY_USER_ID.");
-  process.exit(1);
-}
-
-const payload = {
-  userId,
-  alert: {
-    alert_id: `test-${Date.now()}`,
-    type: "donation",
+export function buildManualTestAlert({
+  now = new Date(),
+  correlationId = `manual-test:${Date.now()}`
+} = {}) {
+  const timestamp = now instanceof Date ? now.toISOString() : new Date(now).toISOString();
+  return {
+    correlationId,
+    providerMessageId: correlationId,
+    alert_id: correlationId,
+    type: "follow",
     username: "RelayTest",
     message: "Test alert from relay server",
-    amount: 5,
-    formatted_amount: "$5.00",
+    amount: null,
+    formatted_amount: null,
     sound_url: null,
-    timestamp: new Date().toISOString(),
-    source: "streamlabs"
-  }
-};
-
-async function run() {
-  const response = await fetch(`${baseUrl}/alert`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  const text = await response.text();
-  console.log(`Status: ${response.status}`);
-  console.log(text);
+    timestamp,
+    source: "twitch_native"
+  };
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+export async function sendManualTestAlert({
+  fetchImpl = globalThis.fetch,
+  baseUrl,
+  userId,
+  now = new Date()
+}) {
+  if (!userId) {
+    throw new Error("Missing RELAY_USER_ID.");
+  }
+
+  const alert = buildManualTestAlert({ now });
+  const response = await fetchImpl(`${baseUrl}/alert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, alert })
+  });
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    text,
+    alert
+  };
+}
+
+async function runCli() {
+  const result = await sendManualTestAlert({
+    fetchImpl: globalThis.fetch,
+    baseUrl,
+    userId
+  });
+  console.log(`Status: ${result.status}`);
+  console.log(result.text);
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runCli().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

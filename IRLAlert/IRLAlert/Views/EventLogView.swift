@@ -226,6 +226,14 @@ struct AlertCardView: View {
                         }
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
+
+                        if let correlationId = event.correlationId {
+                            Text(correlationId)
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.secondary.opacity(0.8))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
                     }
                     .padding(.leading, 8)
                     
@@ -244,7 +252,7 @@ struct AlertCardView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                 
-                // Message block (if provided, usually donations)
+                // Message block for payload text such as channel point rewards.
                 if let message = event.message, !message.isEmpty {
                     Text("\"\(message)\"")
                         .font(.system(size: 13, weight: .medium).italic())
@@ -283,8 +291,6 @@ struct AlertCardView: View {
         case .raid:
             let viewers = event.amount.map { "\(Int($0)) viewers" } ?? "viewers"
             suffix = AttributedString(" is raiding with \(viewers)!")
-        case .donation:
-            suffix = AttributedString(" tipped the stream.")
         case .subscription:
             suffix = AttributedString(" just subscribed!")
         case .bits:
@@ -292,9 +298,8 @@ struct AlertCardView: View {
             suffix = AttributedString(" cheered \(bits) bits.")
         case .follow:
             suffix = AttributedString(" became a follower.")
-        case .host:
-            let viewers = event.amount.map { "\(Int($0)) viewers" } ?? "viewers"
-            suffix = AttributedString(" is hosting with \(viewers).")
+        case .channelPoints:
+            suffix = AttributedString(" redeemed channel points.")
         }
         
         var full = str
@@ -310,8 +315,7 @@ struct AlertCardView: View {
         guard let amt = event.amount else { return nil }
         
         switch event.type {
-        case .donation: return String(format: "$%.2f", amt)
-        case .raid, .host: return "\(Int(amt))"
+        case .raid: return "\(Int(amt))"
         case .bits: return "\(Int(amt))"
         default: return nil
         }

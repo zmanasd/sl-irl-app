@@ -4,7 +4,7 @@ import SwiftUI
 struct AlertTestingView: View {
     @StateObject private var viewModel = AlertTestingVM()
     @EnvironmentObject var settings: AppSettings
-    @State private var selectedAlertType: AlertType = .donation
+    @State private var selectedAlertType: AlertType = .follow
     
     // For haptic feedback
     private let impactMed = UIImpactFeedbackGenerator(style: .medium)
@@ -89,7 +89,7 @@ struct AlertTestingView: View {
             
             VStack(spacing: 8) {
                 HStack {
-                    Text("Signal Integrity")
+                    Text("MVP Readiness")
                         .font(.subheadline.weight(.medium))
                     Spacer()
                     Text(viewModel.isReady ? "100%" : "0%")
@@ -112,7 +112,7 @@ struct AlertTestingView: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
                     .font(.caption)
-                Text(viewModel.isReady ? "Testing engine connected and ready for deployment." : "Waiting for active service connection.")
+                Text(viewModel.isReady ? "Twitch EventSub, relay, and APNs are ready for proof alerts." : "Register this iPhone and run Check MVP Readiness on the Connections tab.")
                     .font(.caption)
                     .lineLimit(2)
             }
@@ -231,12 +231,11 @@ struct AlertTestingView: View {
     
     private func mockDescription(for type: AlertType) -> String {
         switch type {
-        case .donation: return "Simulate $5.00 tip"
         case .follow: return "New follower alert"
         case .subscription: return "Tier 1 Sub alert"
         case .bits: return "100 Bits cheer"
-        case .host: return "Inbound host"
         case .raid: return "Incoming raid (25+)"
+        case .channelPoints: return "Reward redemption"
         }
     }
 }

@@ -1,301 +1,366 @@
-# Enhanced IRL Alert App — Phased Implementation Plan
+# IRL Alert App - Twitch-First MVP Reset Implementation Plan
 
-> [!NOTE]
-> Each phase is split into **🔧 Backend** (services, models, data, audio) and **🎨 Frontend** (SwiftUI views, navigation, design). We complete and verify each phase before moving on.
+## 1. Summary
 
-> [!IMPORTANT]
-> **Architecture pivot (post-Phase 4):** Viability analysis confirmed that iOS **App Store Guideline 2.5.4** prohibits silent audio loops for background execution. The app now uses a **hybrid PiP + backend relay** architecture. See Phase 5A/5B and the Infrastructure Cost Pathway section below.
+This plan resets the project around one defensible MVP vertical slice:
 
----
+**Twitch EventSub -> relay server -> APNs -> iPhone alert receipt -> foreground queue/log/audio**
 
-## Project Timeline
+The previous plan expanded the MVP across PiP, Streamlabs, StreamElements, SoundAlerts, Browser Source parsing, custom third-party alert media, and multi-provider background delivery before the core concept had been proven. That created too much platform and integration risk at once.
 
-```mermaid
-gantt
-    title IRL Alert App — Development Timeline
-    dateFormat  YYYY-MM-DD
-    axisFormat  %b %d
+The reset keeps the useful foundation already present in the repo:
 
-    section Phase 1
-    Project Setup & App Shell (Backend)     :done, p1b, 2026-03-12, 2d
-    Design System & Onboarding (Frontend)   :done, p1f, after p1b, 2d
-    Phase 1 Verification                    :milestone, p1v, after p1f, 0d
+- SwiftUI app shell and screens
+- Alert queue
+- Native audio/TTS playback
+- Local event store
+- Push notification plumbing
+- Notification Service Extension scaffold
+- Node relay server scaffold
+- Initial Twitch EventSub connector work
 
-    section Phase 2
-    Audio Engine & Queue (Backend)          :done, p2b, after p1f, 4d
-    Queue UI & Test Harness (Frontend)      :done, p2f, after p2b, 1d
-    Phase 2 Verification                    :milestone, p2v, after p2f, 0d
+The reset removes these from the MVP critical path:
 
-    section Phase 3
-    WebSocket & Streamlabs (Backend)        :done, p3b, after p2f, 5d
-    Connection UI & Health Dots (Frontend)  :done, p3f, after p3b, 2d
-    Phase 3 Verification                    :milestone, p3v, after p3f, 0d
+- PiP as a background execution mechanism
+- Silent audio backgrounding
+- Streamlabs, StreamElements, and SoundAlerts
+- Browser Source URL parsing
+- Custom third-party alert sounds
+- Donations/tips
 
-    section Phase 4
-    ViewModels (Backend)                    :done, p4b, after p3f, 2d
-    All 5 Screens (Frontend)               :done, p4f, after p4b, 5d
-    Phase 4 Verification                    :milestone, p4v, after p4f, 0d
+The MVP is complete only when a streamer can connect Twitch, enable notifications, trigger supported Twitch events, hear alerts while using another app or with the phone locked, and review received events in the app.
 
-    section Phase 5A — PiP & Backend Relay
-    PiP Controller (iOS)                    :p5a1, after p4f, 3d
-    Backend Relay Server (Node.js)          :p5a2, after p4f, 4d
-    APNs Integration (server + client)      :p5a3, after p5a2, 3d
-    Notification Service Extension          :p5a4, after p5a3, 2d
-    Phase 5A Verification                   :milestone, p5av, after p5a4, 0d
+## 2. Anti-Guesswork Delivery Process
 
-    section Phase 5B — Services & Polish
-    Additional Services & Tests (Backend)   :p5b, after p5av, 5d
-    Polish & Hardening (Frontend)           :p5f, after p5b, 3d
-    MVP Complete                            :milestone, mvp, after p5f, 0d
+No platform-sensitive capability may enter the production MVP path until it has passed an isolated proof harness with observable evidence.
+
+### 2.1 Assumption Ledger
+
+Before implementation, create an assumption ledger for every risky claim. Each item must include:
+
+- Assumption
+- Proof harness
+- Pass criteria
+- Failure evidence to collect
+- Kill or pivot rule
+- Owning subsystem
+
+Initial assumptions:
+
+| Assumption | Proof Harness | Pass Criteria | Pivot Rule |
+|---|---|---|---|
+| Twitch EventSub WebSocket can deliver MVP events to the relay | Minimal relay with Twitch CLI mock events | All supported mock events normalize correctly and dedupe after reconnect | Move to webhook transport or reduce supported event set |
+| APNs can deliver audible alerts while the phone is locked/backgrounded | Relay test endpoint sending APNs to physical iPhone | 9/10 audible notifications under stable network | Reframe MVP as foreground companion or revise alert-delivery promise |
+| iOS can route foreground notification payloads into the queue once | Minimal app-side notification parser and queue path | Same alert appears once in queue/log/playback | Tighten dedupe model before any new feature work |
+| Diagnostics can identify where alert delivery failed | Correlation ID through all systems | Every test alert has a trace from relay to iOS receipt or a clear failure point | Block MVP integration until observability exists |
+
+### 2.2 Proof Harness First
+
+Each risky subsystem must be proven in isolation before being integrated into the main app flow:
+
+1. Twitch EventSub relay proof
+2. APNs delivery proof
+3. iOS notification receipt proof
+4. Foreground queue/audio/TTS proof
+5. End-to-end correlation proof
+
+The implementer must not continue broad tuning if a proof repeatedly fails. Capture evidence, compare against the pivot rule, and decide explicitly.
+
+### 2.3 Correlation IDs
+
+Every alert must carry a correlation chain:
+
+```text
+twitch_message_id -> relay_event_id -> apns_id -> ios_received_id -> queue_event_id -> playback_event_id
 ```
 
-### Timeline Summary
+Logs must make it possible to answer exactly where an alert stopped:
 
-| Phase | Focus | Estimated Duration | Cumulative |
-|---|---|---|---|
-| **1** ✅ | Project Foundation & App Shell | ~4 days | Week 1 |
-| **2** ✅ | Background Audio Engine & Alert Queue | ~5 days | Week 2 |
-| **3** ✅ | Networking & Streamlabs Integration | ~7 days | Week 3–4 |
-| **4** ✅ | UI Implementation (all screens) | ~7 days | Week 4–5 |
-| **5A** | PiP + Backend Relay + APNs | ~10–12 days | Week 6–7 |
-| **5B** | Additional Services, Polish & Hardening | ~8 days | Week 8–9 |
-| | **Total estimated MVP** | **~41–43 working days (~8–9 weeks)** | |
+- Twitch/WebSocket
+- Relay normalization
+- APNs send
+- APNs delivery or iOS receipt
+- App queue
+- Audio/TTS playback
 
-> [!IMPORTANT]
-> **Critical path:** Phase 5A (PiP + Backend Relay) is the new highest-risk phase: it requires building a server-side component, integrating APNs, and implementing the PiP controller — all of which are new to the codebase. Phase 5B depends on 5A being stable.
+### 2.4 Diagnostics
 
----
+The app must include a diagnostics screen or export before MVP validation. It must show:
 
-## Design System Reference (from `stitch.zip`)
+- Notification permission state
+- APNs device-token registration timestamp
+- Relay registration status
+- Last received notification correlation ID
+- Last queued alert correlation ID
+- Last audio/TTS playback start/finish status
+- Current audio route/category
 
-| Token | Value |
-|---|---|
-| Primary Color | `#2b7cee` |
-| Background (Dark) | `#101822` |
-| Surface (Dark) | `#1c2431` / `#161e2b` |
-| Background (Light) | `#f6f7f8` |
-| Font | Inter (weights 300–700) |
-| Corner Radius | 8px default, 16px cards, 24px hero |
-| Icon System | Material Symbols Outlined → SF Symbols equivalents |
-| Nav Style | iOS tab bar with blur backdrop |
+The relay must expose diagnostics or health output for:
 
----
+- Twitch session state
+- EventSub subscription status
+- Last keepalive timestamp
+- Reconnect count
+- OAuth token refresh state
+- Last normalized alert
+- Last APNs send result
+- `apns-id` where available
 
-## Phase 1 — Project Foundation & App Shell ✅
+### 2.5 Hard Gates
 
-### 🔧 Backend
-1. Initialize **Xcode project** (Swift 6, SwiftUI, iOS 17+ target)
-2. Configure **`Info.plist`** — enable `audio` background mode, set bundle ID
-3. Set up folder structure: `Models/`, `Views/`, `ViewModels/`, `Services/`, `Utils/`
-4. Create **`AppSettings`** model backed by `UserDefaults` (first-launch flag, basic prefs)
-5. Build **`NavigationRouter`** (`ObservableObject`) to manage app flow (onboarding → main)
-6. ⚠️ **RISK MITIGATION — Register OAuth Apps Early:** Submit OAuth application registrations for **Streamlabs**, **StreamElements**, and **Twitch** developer portals now. Approvals can take days-to-weeks; starting in Phase 1 prevents blocking Phase 3+. Document client IDs, redirect URIs, and approval status in a `CREDENTIALS.md` (gitignored).
+Feature work cannot graduate into the MVP path unless the related proof gate passes:
 
-### 🎨 Frontend
-6. Create **`DesignSystem.swift`** — color tokens, typography, corner-radius constants matching stitch designs
-7. Build **`TabBarView`** — bottom tab navigation (Dashboard, Alerts, Testing, Settings) with iOS blur backdrop
-8. Create **placeholder views**: `DashboardView`, `EventLogView`, `ConnectionsView`, `AlertTestingView`, `SettingsView`
-9. Implement **`OnboardingView`** — multi-step paging, permission prompts, "Skip", progress dots
+- Twitch mock events reach relay normalization with no duplicates.
+- Relay sends APNs and records success/failure with correlation ID.
+- Locked/backgrounded iPhone receives audible notification 9/10 times on stable network.
+- Foreground notifications route into the alert queue once.
+- Reconnect tests do not duplicate alerts.
 
-### ✅ Verify
-App launches → onboarding on first run → navigates to tab bar with placeholder screens.
+## 3. Implementation Phases
 
----
+### Phase 0 - Documentation And Scope Reset
 
-## Phase 2 — Background Audio Engine & Alert Queue ✅
+Goal: make the new MVP definition unambiguous before code work begins.
 
-### 🔧 Backend
-1. **`AudioSessionManager`** — configure `AVAudioSession` (`.playback`, `.mixWithOthers`), handle interruptions & route changes
-2. ~~**`SilentAudioPlayer`** — loop a silent audio track to prevent iOS process suspension~~ ⚠️ **DEPRECATED:** Silent audio loops violate App Store Guideline 2.5.4. Background execution is now handled via PiP (Phase 5A). `SilentAudioPlayer` is retained for TestFlight/development use only and **must not ship** to the App Store.
-3. **`AudioPlaybackService`** — download, cache, and play alert sounds (`AVAudioPlayer`) with completion callback
-4. **`TTSManager`** — wrap `AVSpeechSynthesizer`, configurable voice/rate/volume, completion callback
-5. **`AlertQueueManager`** — FIFO queue processing `AlertEvent` items sequentially:
-   - Sound → TTS → inter-alert delay (default 1s)
-   - Overflow threshold (default 20): summarize/skip when exceeded
-   - Expose observable `queueCount`
-6. **`MediaCacheManager`** — download remote sound files to disk, serve from cache on repeat
+Tasks:
 
-### 🎨 Frontend
-7. Add **queue status indicator** component (pending count + pulsing dot) — reusable across Event Log and Dashboard
-8. Wire **Alert Testing placeholder** to fire mock `AlertEvent`s through the queue
+- Update the PRD so MVP means Twitch Native EventSub only.
+- Mark PiP, silent audio, Browser Source parsing, Streamlabs, StreamElements, SoundAlerts, custom media, and donations/tips as post-MVP.
+- Keep the Phase 5A PiP report and walkthrough as diagnostic history.
+- Add the assumption ledger to project documentation.
+- Record that background alert delivery for MVP is APNs-based, not continuous in-app execution.
 
-### ✅ Verify
-Fire a mock alert → hear audio + TTS. Minimize app → fire another → hear it play over Spotify/Music.
+Exit criteria:
 
----
+- PRD and implementation plan agree on the MVP scope.
+- No MVP task depends on PiP or silent audio.
 
-## Phase 3 — Networking & Service Integration ✅
+### Phase 1 - Isolated Twitch EventSub Relay Proof
 
-### 🔧 Backend
-1. **`AlertEvent` model** — unified struct: `id`, `type` (donation/follow/sub/bits/host/raid), `username`, `message`, `amount`, `soundURL`, `timestamp`, `source`
-2. **`AlertServiceProtocol`** — contract: `connect()`, `disconnect()`, `onAlert` callback, `connectionState` publisher
-3. **`WebSocketClient`** — generic client via `URLSessionWebSocketTask`:
-   - Auto-reconnect with exponential backoff (1s → 2s → 4s → … → 30s)
-   - Ping/pong heartbeat
-   - State: `.connected`, `.connecting`, `.disconnected`, `.reconnecting`
-4. **`StreamlabsService`** (first integration) — implements `AlertServiceProtocol`:
-   - **Browser Source URL mode:** parse overlay URL → extract socket token → native WebSocket
-   - **OAuth mode:** `ASWebAuthenticationSession` → obtain token → connect
-   - Parse JSON payloads into `AlertEvent`
-5. ⚠️ **RISK MITIGATION — Browser Source URL Token Resilience:** Build the URL parser with a **versioned regex strategy** — extract the socket token using multiple known Streamlabs URL patterns. Add a unit test suite with 5+ real-world URL formats. If token extraction fails at runtime, surface a clear user error ("URL format not recognized") and prompt the user to fall back to OAuth sign-in instead. Log failed URL patterns for future pattern updates.
-6. **`ConnectionManager`** — orchestrates multiple service instances, exposes per-service health status
-7. **`EventStore`** — persist recent events locally (SwiftData or JSON file, cap ~500)
-8. **Disconnect notification** — if connection drops >30s, fire `UNUserNotification`
+Goal: prove Twitch events can be received and normalized by the relay before app UX changes.
 
-### 🎨 Frontend
-8. Build **`ConnectionsView`** input flow — text field for Browser Source URL, OAuth sign-in button
-9. Add **connection health dots** (green/red) to Dashboard service connectivity grid
+Tasks:
 
-### ✅ Verify
-Paste a Streamlabs URL → connect → receive a real donation alert. Kill Wi-Fi → see reconnection → resume.
+- Implement Twitch OAuth authorization-code flow with refresh-token support.
+- Keep Twitch OAuth tokens server-side only.
+- Store tokens with production-ready encryption design; local dev storage may be simpler but must be clearly marked as dev-only.
+- Fetch the broadcaster user ID from Twitch after OAuth.
+- Connect to Twitch EventSub WebSocket.
+- Subscribe to MVP Twitch events:
+  - `channel.follow`
+  - `channel.subscribe`
+  - `channel.subscription.gift`
+  - `channel.subscription.message`
+  - `channel.cheer`
+  - `channel.raid`
+  - optionally `channel.channel_points_custom_reward_redemption.add`
+- Normalize every Twitch event into the app alert shape with `correlationId` and provider message ID.
+- Use Twitch CLI mock WebSocket events for repeatable testing before live stream testing.
+- Add dedupe by Twitch message ID.
+- Handle EventSub keepalive and reconnect messages.
 
----
+Exit criteria:
 
-## Phase 4 — UI Implementation ✅
+- All supported Twitch CLI mock events produce normalized alert payloads.
+- Relay logs show correlation IDs and provider message IDs.
+- Reconnect does not duplicate alerts.
 
-### 🔧 Backend
-1. Create **ViewModels** for each screen binding to real services (`DashboardVM`, `EventLogVM`, `ConnectionsVM`, `SettingsVM`, `AlertTestingVM`)
+### Phase 2 - Isolated APNs Delivery Proof
 
-### 🎨 Frontend
-2. **`DashboardView`** — hero status circle, service grid, metrics cards. Ref: `stitch/refined_dashboard/screen.png`
-3. **`EventLogView`** — queue status, filter tabs, color-coded alert cards. Ref: `stitch/refined_event_log/screen.png`
-4. **`ConnectionsView`** — sync banner, service grid, Quick Connect. Ref: `stitch/refined_connections/screen.png`
-5. **`AlertTestingView`** — readiness gauge, alert type grid, deploy CTA. Ref: `stitch/refined_alert_testing/screen.png`
-6. **`SettingsView`** — volume sliders, TTS voice, filters, threshold. Ref: `stitch/refined_settings/screen.png`
+Goal: prove the relay can send audible alerts to a real iPhone in background/locked states.
 
-### ✅ Verify
-Visual comparison of each screen against `screen.png` references. All screens show live data.
+Tasks:
 
----
+- Add or harden a relay test-alert endpoint.
+- Send visible APNs notifications with:
+  - alert title/body
+  - bundled/default notification sound
+  - normalized alert payload
+  - `correlationId`
+- Log APNs result, Apple response status, `apns-id`, alert type, and device-token hash.
+- Do not rely on silent push for MVP alert delivery.
+- Use physical-device testing with a valid push entitlement.
 
-## Phase 5A — PiP Controller & Backend Relay (NEW)
+Exit criteria:
 
-> [!IMPORTANT]
-> This phase implements the **App Store-compliant background execution strategy** described in PRD §5.2. It replaces the `SilentAudioPlayer` approach with a hybrid PiP + server push architecture.
+- On stable network, 9/10 locked or backgrounded test alerts produce audible notification.
+- Failed APNs attempts identify a concrete relay/APNs error.
+- App receives foreground notification payloads when active.
 
-### 🔧 Backend (iOS)
-1. **`PiPManager`** — manage `AVPictureInPictureController` lifecycle:
-   - Start PiP automatically when app enters background (if user has enabled it)
-   - Render a lightweight video layer showing: last alert info, connection status, queue count
-   - Handle PiP restore (user taps to return to full app)
-   - Ensure WebSocket connections remain alive while PiP is active
-2. **`PushNotificationManager`** — register for APNs, store device token, handle incoming push payloads:
-   - Parse alert payloads from push notifications
-   - Route to `AlertQueueManager` for playback
-3. **`NotificationServiceExtension`** [NEW TARGET] — Xcode Notification Service Extension:
-   - Intercept incoming alert pushes before display
-   - Attach custom alert sound (download if needed within ~30s window)
-   - Modify notification content with alert details
-4. **Modify `ConnectionManager`** — add awareness of PiP state:
-   - When PiP active: use direct WebSocket (Layer 2)
-   - When PiP dismissed: signal backend relay to take over (Layer 3)
-   - Send device token to relay server on registration
+### Phase 3 - iOS MVP Integration
 
-### 🔧 Backend (Server — Node.js)
-5. **`relay-server/`** [NEW CODEBASE] — lightweight Node.js relay server:
-   - **User registration endpoint** — iOS app sends: device APNs token + service credentials (socket token / OAuth token)
-   - **Per-user WebSocket connections** — server maintains persistent connections to Streamlabs/Twitch/SE/SoundAlerts on behalf of each user
-   - **Alert forwarding** — on alert event, send high-priority APNs payload to user's device via `@parse/node-apn` or `apns2`
-   - **Health monitoring** — reconnect dropped service connections with exponential backoff
-   - **Activation/deactivation** — iOS app signals when it has a direct connection (PiP/foreground) → server pauses push forwarding to avoid duplicates
-   - **Deployment:** Fly.io (see Infrastructure Cost Pathway below)
+Goal: integrate the proven relay and APNs path into the app without reintroducing background-execution guesswork.
 
-### 🎨 Frontend
-6. **PiP status view** — minimal SwiftUI view rendered into the PiP video layer (alert name, connection dot, queue count)
-7. **Settings integration** — add "Enable PiP on Background" toggle to `SettingsView`
-8. **Push notification opt-in** — onboarding step or settings toggle for push-based fallback alerts
+Tasks:
 
-### ✅ Verify
-1. App in foreground → receive alert via direct WebSocket → audio plays ✅
-2. App backgrounded with PiP → PiP window visible → alert arrives → audio plays ✅
-3. PiP dismissed → backend relay active → alert arrives as push notification → sound plays ✅
-4. App terminated → push notification with alert sound ✅
-5. Return to foreground → relay deactivates → direct WebSocket resumes ✅
+- Simplify onboarding to Twitch connection plus notification permission.
+- Register the APNs device token with the relay.
+- Add relay registration status to the UI.
+- Remove `SilentAudioPlayer` from shipping startup behavior.
+- Keep PiP settings and PiP startup out of the MVP UX.
+- Parse normalized notification payloads into the existing alert model.
+- Dedupe by `correlationId` or provider message ID.
+- Foreground behavior:
+  - enqueue alert
+  - persist event
+  - play native audio/TTS using existing services
+- Background/locked/terminated behavior:
+  - rely on iOS notification display and sound
+  - persist/reconcile event when the app next receives or opens the payload
+- Add diagnostics screen/export.
 
----
+Exit criteria:
 
-## Phase 5B — Additional Services, Polish & Hardening
+- Foreground notification routes into queue/log/playback once.
+- Background or locked notification is audible.
+- Diagnostics show the same correlation ID across receipt, queue, and playback where applicable.
 
-### 🔧 Backend
-1. **`StreamElementsService`** — second integration via `AlertServiceProtocol`
-2. **`TwitchNativeService`** — Twitch EventSub WebSocket for native alerts
-3. **`SoundAlertsService`** — SoundAlerts integration
-4. **Offline queue recovery** — fetch missed events on reconnection (if service API supports)
-5. **Unit tests** for `AlertQueueManager`, `WebSocketClient` reconnect logic, `EventStore`
-6. **Server-side service connectors** — add StreamElements, Twitch, SoundAlerts to the relay server
+### Phase 4 - Relay Persistence And Reliability
 
-### 🎨 Frontend
-7. **Disconnect notification settings** — configurable timeout in Settings
-8. Final **polish pass** — animations, transitions, haptics, dark/light mode parity
-9. **UI Polish — Service Logos**: Replace SF Symbol placeholders for Twitch, StreamElements, Streamlabs, and SoundAlerts with their actual brand logos
-10. Update `ConnectionsView` to show all supported services
+Goal: harden the relay enough that MVP tests are meaningful and repeatable.
 
-### ✅ Verify
-Unit tests pass. Multi-service connection. 30-minute background soak test with PiP. Push notification fallback test.
+Tasks:
 
----
+- Add durable storage for:
+  - users
+  - devices
+  - Twitch OAuth tokens
+  - EventSub session/subscription state
+  - recent provider message IDs
+  - recent delivery attempts
+- Add token refresh handling.
+- Add relay restart recovery.
+- Add Twitch keepalive timeout detection.
+- Add health/diagnostics endpoints.
+- Add manual "send test alert" flow from app to relay.
 
-## Infrastructure Cost Pathway
+Exit criteria:
 
-### Fixed Costs
+- Relay restart does not lose registered users/devices.
+- Token refresh path works in test.
+- Health output identifies Twitch, relay, APNs, and device registration state.
+- `npm run proof` captures health, `/ready?userId=...`, before/after diagnostics, a correlated test alert, and a pass/fail summary without exposing secrets.
 
-| Item | Cost | Frequency |
-|---|---|---|
-| Apple Developer Program | **$99** | Per year |
-| APNs (Push Notifications) | **$0** | Free from Apple |
-| Domain name (optional, for relay API) | ~$12 | Per year |
-| **Fixed total** | **~$111/year** (~$9.25/mo) | |
+### Phase 5 - End-To-End MVP Validation
 
-### Relay Server Hosting — Recommended: Fly.io
+Goal: validate the complete Twitch-first MVP on a real device.
 
-| Scale | Fly.io Spec | Server Cost/mo | Notes |
-|---|---|---|---|
-| **Launch (1–50 users)** | shared-cpu-1x, 256 MB | **~$2–3** | No per-connection charge. Billed per second |
-| **Growth (50–500 users)** | shared-cpu-1x, 512 MB | **~$4–7** | Bandwidth ~$0.02/GB |
-| **Scale (500–5,000 users)** | 2× shared-cpu-2x, 1 GB each | **~$15–30** | Horizontal scaling |
+Test states:
 
-### Total Monthly Cost
+- App foreground
+- App backgrounded
+- Phone locked
+- App terminated
+- Network drop/reconnect
+- Expired Twitch token refresh
+- Notification permission denied
 
-| Scale | Server | Apple (amortized) | **Total/month** |
-|---|---|---|---|
-| **Launch** | $2–3 | $8.25 | **~$10–12** |
-| **Growth** | $4–7 | $8.25 | **~$13–16** |
-| **Scale** | $15–30 | $8.25 | **~$24–39** |
+Exit criteria:
 
-> [!TIP]
-> At launch scale, total infrastructure cost is **~$10–12/month** (~$130/year). This is comparable to a single streaming subscription. Costs scale linearly with user count and remain modest even at thousands of concurrent users.
+- Twitch mock or real event produces one traceable correlation ID across relay, APNs, iOS receipt, and event log.
+- Foreground event plays native audio/TTS.
+- Background/locked event produces audible notification.
+- No duplicate event-log or queue entries after reconnect.
+- Permission-denied and relay-disconnected states are visible and actionable.
+- Each real-device validation session stores the `npm run proof` JSON output alongside iOS diagnostics screenshots and relay logs for the tested correlation IDs.
 
-### Alternative Providers (for reference)
+## 4. Interfaces And Payloads
 
-| Provider | Launch Cost | Pros | Cons |
-|---|---|---|---|
-| **Railway** | ~$5/mo (Hobby) | Simple deploy, $5 credit included | Higher base cost |
-| **Render** | ~$7/mo (Starter) | Predictable pricing, native WebSocket support | Free tier spins down (bad for WebSockets) |
-| **Self-hosted VPS** | ~$4–6/mo (Hetzner/DigitalOcean) | Full control | Manual ops, no auto-scaling |
+### 4.1 Normalized Alert Payload
 
----
+All relay-to-app alert payloads must include:
 
-## Summary Matrix
+```json
+{
+  "correlationId": "string",
+  "providerMessageId": "string",
+  "source": "twitch_native",
+  "type": "follow | subscription | bits | raid | channel_points",
+  "username": "string",
+  "message": "string|null",
+  "amount": "number|null",
+  "formattedAmount": "string|null",
+  "timestamp": "ISO-8601 string"
+}
+```
 
-| Phase | Backend Tasks | Frontend Tasks | Key Risk |
-|---|---|---|---|
-| 1 ✅ | Project setup, data models, router | Design system, tab bar, onboarding | None (foundation) |
-| 2 ✅ | Audio session, TTS, queue, caching | Queue indicator, test harness | ~~iOS background suspension~~ Resolved by PiP |
-| 3 ✅ | WebSocket, Streamlabs, event store | Connection input UI, health dots | Service API changes |
-| 4 ✅ | ViewModels | All 5 main screens | Design fidelity |
-| 5A | PiP controller, relay server, APNs | PiP view, push settings | PiP content approval, APNs integration |
-| 5B | 3 more services, offline recovery, tests | Polish, logos, settings expansion | API coverage |
+The app may map this into `AlertEvent`, but it must preserve `correlationId` or `providerMessageId` for dedupe and diagnostics.
 
----
+### 4.2 Relay Capabilities
 
-## Risk Mitigation Tracker
+The relay must provide:
 
-| Risk | Phase | Mitigation Action |
-|---|---|---|
-| OAuth app registration lead time | **1** (task 6) | Register apps on all three platforms immediately; track approval status |
-| ~~iOS background process suspension~~ | ~~**2** (task 7)~~ | ~~Physical device soak test~~ → **Resolved:** PiP (Phase 5A) replaces silent audio loop |
-| Browser Source URL token extraction fragility | **3** (task 5) | Versioned regex parser, unit test suite, graceful OAuth fallback |
-| **App Store Guideline 2.5.4 (silent audio)** | **5A** | `SilentAudioPlayer` deprecated. PiP + APNs fallback is App Store compliant |
-| **PiP content review** | **5A** (task 1) | PiP renders meaningful content (alert info, status). Not a blank/fake video |
-| **Relay server availability** | **5A** (task 5) | Fly.io auto-restart on crash. Health monitoring with exponential backoff reconnection |
-| **APNs delivery latency** | **5A** (task 3) | APNs is fallback only — primary path (PiP) has zero additional latency |
+- Twitch OAuth start/callback
+- Device registration/update
+- Twitch EventSub session management
+- Test alert send
+- Health/diagnostics
+- APNs alert forwarding
+
+### 4.3 App Capabilities
+
+The app must provide:
+
+- Twitch connect entry point
+- Notification permission prompt/status
+- Relay registration status
+- Alert event log
+- Foreground queue/audio/TTS
+- Diagnostics screen/export
+- Test alert trigger
+
+## 5. Test Plan
+
+### Unit Tests
+
+- Twitch event normalization for each supported event type.
+- Dedupe by provider message ID and correlation ID.
+- Notification payload parser.
+- Queue processing and overflow behavior.
+- OAuth token refresh decision logic.
+
+### Relay Integration Tests
+
+- Twitch CLI mock events reach normalized alert output.
+- EventSub reconnect does not duplicate alerts.
+- APNs sender records success/failure with correlation ID.
+- Relay restart restores users/devices/subscription state.
+
+### iOS Tests
+
+- Foreground notification routes to queue once.
+- Alert payload persists to event log.
+- Permission-denied state displays blocked status.
+- Diagnostics screen reports latest token, relay, notification, queue, and playback state.
+- Diagnostics screen reports the same per-user MVP readiness gate used by `npm run proof`.
+
+### Physical Device Acceptance Tests
+
+- 9/10 audible APNs notifications while locked/backgrounded on stable network.
+- Foreground alert plays native audio/TTS.
+- Terminated app still receives visible/audible notification.
+- Reconnect test produces no duplicate queue entries.
+- One correlation ID is traceable from relay to iOS diagnostics.
+- `GET /ready?userId=<relay-user-id>` and the app's Check MVP Readiness action agree before APNs acceptance testing starts.
+
+## 6. Post-MVP Work
+
+These features remain intentionally out of scope until the Twitch-first MVP passes:
+
+- Streamlabs integration
+- StreamElements integration
+- SoundAlerts integration
+- Donations/tips
+- Browser Source URL parsing
+- Custom alert media from third-party services
+- PiP as a background execution mechanism
+- Apple Watch or Live Activity companion surfaces
+- Android support
+
+## 7. Reference Links
+
+- Twitch EventSub WebSockets: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
+- Twitch EventSub subscription types: https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/
+- Twitch CLI WebSocket event testing: https://dev.twitch.tv/docs/cli/websocket-event-command/
+- Apple remote notification payloads: https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CreatingtheNotificationPayload.html
+- Apple App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/

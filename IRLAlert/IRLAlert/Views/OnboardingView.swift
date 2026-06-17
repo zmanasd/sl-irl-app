@@ -231,25 +231,7 @@ struct OnboardingPageView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Enable Push Alerts")
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("Receive alerts when the app is backgrounded.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.primary))
-                    .padding(16)
-                    .background(Color.appCard)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.medium))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
-                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                    )
-
-                    Toggle(isOn: $appSettings.pipEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable Picture-in-Picture")
-                                .font(.system(size: 15, weight: .semibold))
-                            Text("Keeps alerts live while multitasking.")
+                            Text("Receive APNs notifications for Twitch relay alerts.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -277,7 +259,7 @@ struct OnboardingPageView: View {
         switch pageIndex {
         case 0: return "video.badge.waveform" // Streaming
         case 1: return "bell.badge.fill" // Notifications
-        case 2: return "speaker.wave.3.fill" // Background audio
+        case 2: return "server.rack" // Relay
         case 3: return "link.icloud.fill" // Connections
         default: return "star.fill"
         }
@@ -297,18 +279,18 @@ struct OnboardingPageView: View {
         switch pageIndex {
         case 0: return "IRL Stream Alerts"
         case 1: return "Stay Informed"
-        case 2: return "Always Listening"
-        case 3: return "Plug & Play"
+        case 2: return "Twitch Relay"
+        case 3: return "Push-First Setup"
         default: return ""
         }
     }
     
     private var pageSubtitle: String {
         switch pageIndex {
-        case 0: return "Never miss a donation, sub, or raid while you're live out in the real world."
-        case 1: return "Important alerts trigger local notifications so you never miss a beat."
-        case 2: return "IRL Alert runs in the background, mixing alerts over your streaming app directly into your earpiece."
-        case 3: return "Connect via Streamlabs URLs or direct OAuth to Twitch and StreamElements."
+        case 0: return "Keep up with follows, subs, bits, and raids while you're live out in the real world."
+        case 1: return "Twitch relay alerts arrive as APNs notifications with traceable delivery details."
+        case 2: return "The relay listens to Twitch EventSub and forwards normalized alerts to your iPhone."
+        case 3: return "Connect Twitch through the relay, enable push alerts, then prove delivery with correlation IDs."
         default: return ""
         }
     }
@@ -323,12 +305,13 @@ struct OnboardingPageView: View {
         switch pageIndex {
         case 1:
             return [
-                DetailCard(icon: "bell.and.waves.left.and.right", title: "Allow Notifications", subtitle: "Crucial for disconnect warnings and background alert text."),
-                DetailCard(icon: "exclamationmark.triangle.fill", title: "Critical Alerts", subtitle: "Get warned immediately if your connection drops.")
+                DetailCard(icon: "bell.and.waves.left.and.right", title: "Allow Notifications", subtitle: "Required for locked and backgrounded alert awareness."),
+                DetailCard(icon: "speaker.wave.2.fill", title: "Notification Sound", subtitle: "APNs sound is the MVP background alert mechanism.")
             ]
         case 2:
             return [
-                DetailCard(icon: "music.note", title: "Audio Permissions", subtitle: "Required to establish the continuous background audio session."),
+                DetailCard(icon: "link", title: "Correlation IDs", subtitle: "Each proof alert is traceable from relay to Event Log."),
+                DetailCard(icon: "server.rack", title: "Relay URL", subtitle: "Use a reachable LAN or tunnel URL when testing on a physical iPhone.")
             ]
         default:
             return []

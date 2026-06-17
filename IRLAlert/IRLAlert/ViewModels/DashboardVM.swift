@@ -2,20 +2,11 @@ import Foundation
 import Combine
 
 /// ViewModel for the Dashboard screen.
-/// Provides live connection health, queue status, and session metrics.
+/// Provides queue status and session metrics.
 @MainActor
 final class DashboardVM: ObservableObject {
     
     // MARK: - Published State
-    
-    /// Per-service connection health
-    @Published private(set) var serviceStates: [ServiceIdentifier: ConnectionState] = [:]
-    
-    /// Whether any service is currently connected
-    @Published private(set) var hasActiveConnection = false
-    
-    /// Count of active (connected) services
-    @Published private(set) var activeServiceCount = 0
     
     /// Current queue depth
     @Published private(set) var queueCount = 0
@@ -46,27 +37,13 @@ final class DashboardVM: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let connectionManager = ConnectionManager.shared
     private let queueManager = AlertQueueManager.shared
-    private var cancellables = Set<AnyCancellable>()
     
     init() {
-        bindConnectionManager()
         bindQueueManager()
     }
     
     // MARK: - Bindings
-    
-    private func bindConnectionManager() {
-        connectionManager.$serviceStates
-            .assign(to: &$serviceStates)
-        
-        connectionManager.$hasActiveConnection
-            .assign(to: &$hasActiveConnection)
-        
-        connectionManager.$activeServiceCount
-            .assign(to: &$activeServiceCount)
-    }
     
     private func bindQueueManager() {
         queueManager.$queueCount

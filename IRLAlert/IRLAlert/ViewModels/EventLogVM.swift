@@ -29,22 +29,22 @@ final class EventLogVM: ObservableObject {
     
     enum EventFilter: String, CaseIterable, Identifiable {
         case all = "All"
-        case donation = "Donations"
         case subscription = "Subs"
         case bits = "Bits"
         case follow = "Follows"
         case raid = "Raids"
+        case channelPoints = "Points"
         
         var id: String { rawValue }
         
         var alertType: AlertType? {
             switch self {
             case .all: return nil
-            case .donation: return .donation
             case .subscription: return .subscription
             case .bits: return .bits
             case .follow: return .follow
             case .raid: return .raid
+            case .channelPoints: return .channelPoints
             }
         }
     }

@@ -17,12 +17,11 @@ final class AppSettings: ObservableObject {
         static let hapticFeedbackEnabled = "hapticFeedbackEnabled"
         static let queueOverflowThreshold = "queueOverflowThreshold"
         static let interAlertDelay = "interAlertDelay"
-        static let disconnectNotificationTimeout = "disconnectNotificationTimeout"
         static let enabledAlertTypes = "enabledAlertTypes"
         static let ttsRate = "ttsRate"
-        static let pipEnabled = "pipEnabled"
         static let pushNotificationsEnabled = "pushNotificationsEnabled"
         static let relayUserId = "relayUserId"
+        static let relayBaseURL = "relayBaseURL"
     }
 
     private let defaults: UserDefaults
@@ -93,16 +92,6 @@ final class AppSettings: ObservableObject {
 
     // MARK: - Connectivity
 
-    /// Seconds of disconnection before firing a local notification (default 30s)
-    @Published var disconnectNotificationTimeout: Double = 30.0 {
-        didSet { defaults.set(disconnectNotificationTimeout, forKey: Keys.disconnectNotificationTimeout) }
-    }
-
-    /// Whether Picture-in-Picture should activate when the app backgrounds
-    @Published var pipEnabled: Bool = false {
-        didSet { defaults.set(pipEnabled, forKey: Keys.pipEnabled) }
-    }
-
     /// Whether push notifications are enabled for background alert delivery
     @Published var pushNotificationsEnabled: Bool = false {
         didSet { defaults.set(pushNotificationsEnabled, forKey: Keys.pushNotificationsEnabled) }
@@ -110,6 +99,11 @@ final class AppSettings: ObservableObject {
 
     /// Stable identifier for relay registration
     @Published private(set) var relayUserId: String = UUID().uuidString
+
+    /// Relay server base URL used for registration, Twitch OAuth, diagnostics, and test alerts
+    @Published var relayBaseURL: String = "http://localhost:3000" {
+        didSet { defaults.set(relayBaseURL, forKey: Keys.relayBaseURL) }
+    }
 
     // MARK: - Alert Type Filters
 
@@ -132,11 +126,10 @@ final class AppSettings: ObservableObject {
             Keys.hapticFeedbackEnabled: true,
             Keys.queueOverflowThreshold: 20,
             Keys.interAlertDelay: 1.0,
-            Keys.disconnectNotificationTimeout: 30.0,
             Keys.ttsRate: Float(0.5),
-            Keys.pipEnabled: false,
             Keys.pushNotificationsEnabled: false,
             Keys.relayUserId: UUID().uuidString,
+            Keys.relayBaseURL: "http://localhost:3000",
         ])
     }
 
@@ -149,11 +142,10 @@ final class AppSettings: ObservableObject {
         hapticFeedbackEnabled = defaults.bool(forKey: Keys.hapticFeedbackEnabled)
         queueOverflowThreshold = defaults.integer(forKey: Keys.queueOverflowThreshold)
         interAlertDelay = defaults.double(forKey: Keys.interAlertDelay)
-        disconnectNotificationTimeout = defaults.double(forKey: Keys.disconnectNotificationTimeout)
-        pipEnabled = defaults.bool(forKey: Keys.pipEnabled)
         pushNotificationsEnabled = defaults.bool(forKey: Keys.pushNotificationsEnabled)
         relayUserId = defaults.string(forKey: Keys.relayUserId) ?? UUID().uuidString
         defaults.set(relayUserId, forKey: Keys.relayUserId)
+        relayBaseURL = defaults.string(forKey: Keys.relayBaseURL) ?? "http://localhost:3000"
 
         if let rawValues = defaults.array(forKey: Keys.enabledAlertTypes) as? [String] {
             enabledAlertTypes = Set(rawValues.compactMap { AlertType(rawValue: $0) })

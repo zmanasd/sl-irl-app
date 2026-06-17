@@ -1,113 +1,193 @@
-# Product Requirements Document (PRD): Enhanced IRL Alert App
+# Product Requirements Document: IRL Alert App - Twitch-First MVP
 
 ## 1. Overview
-The Enhanced IRL Alert App is a background-capable alert relay application designed specifically for In-Real-Life (IRL) streamers. Its primary purpose is to ensure that streamers reliably hear and see their stream alerts (donations, follows, subscriptions, hosts, raids, etc.) while streaming from their mobile devices, without interrupting their primary streaming software.
+
+IRL Alert is an iOS companion app for mobile IRL streamers who need reliable awareness of Twitch stream interactions while using another mobile streaming app.
+
+The MVP proves one core concept:
+
+**Twitch EventSub -> relay server -> APNs -> iPhone alert receipt -> foreground queue/log/audio**
+
+The app is not trying to reproduce every third-party alert provider at MVP. It first proves that Twitch-native events can be received server-side, delivered to an iPhone through push notifications, reviewed in the app, and played through native audio/TTS when the app is active.
 
 ## 2. Problem Statement
-The current prototype (`sl-irl-bridge`) relies on a browser-based WebSocket connection to receive alerts. On mobile platforms, specifically Apple (iOS) devices, web browsers are placed into a stasis/suspended state when minimized to conserve battery. This inherently breaks WebSocket connections and pauses audio playback, causing IRL streamers to miss essential alerts when their primary streaming application (e.g., Moblin, Twitch App) is active on screen.
 
-## 3. Target Audience & Use Case
-**Target Audience:** IRL Streamers that stream from mobile devices (specifically iPhones) and require a reliable alert relay that runs silently in the background.
+Mobile browsers and many app processes are suspended by iOS when backgrounded. A browser-based alert bridge can lose WebSocket connectivity or pause audio playback when the streamer switches to Moblin, the Twitch app, or another streaming tool.
 
-**Primary Use Case:** A streamer goes live using a mobile streaming app. They run this Enhanced Alert App in the background. As viewers interact with the stream (subscribing, donating, etc.), the streamer hears the alert audio and text-to-speech (TTS) natively mixed with their device audio, ensuring they never miss an interaction even when reading chat from their primary app (like Moblin).
+Previous planning attempted to solve this with silent audio, PiP, direct service sockets, and multiple third-party alert services in one MVP. That created too much platform risk before the basic product loop had been proven.
 
-## 4. Core Objectives & Requirements
+The reset MVP focuses on a narrower proof: keep alert listening server-side using Twitch EventSub and deliver mobile awareness through APNs, with strong diagnostics so failures can be located rather than guessed at.
 
-1. **A Working Alerts System:** The app must reliably receive and process alerts from major streaming services (Streamlabs, StreamElements, SoundAlerts, Twitch Native Alerts).
-2. **Plays Alerts Continuously in the Background:** The application must maintain network connections and play audio even when the app is minimized or the device screen is locked, successfully mixing audio over the primary mobile streaming app without interrupting it.
-3. **Pulls the Full Alert:** The app must fetch and display/play the complete alert payload from the chosen alert service, including any custom sounds, text, or TTS configured by the user.
+## 3. Target Audience And Use Case
 
-### 4.1. Supported Alert Types (MVP)
-At minimum, the following event types must be supported across all connected services:
-- **Donations / Tips**
-- **Follows**
-- **Subscriptions** (new, resub, gifted, mystery/bomb gifts)
-- **Bits / Cheers**
-- **Hosts**
-- **Raids**
+**Target audience:** iPhone-based IRL streamers who stream through mobile tools and need reliable Twitch interaction alerts while another app is foregrounded or the phone is locked.
 
-Additional service-specific types (e.g., SoundAlerts custom sound redemptions, Twitch channel point redeems) may be added post-MVP.
+**Primary use case:** A streamer signs in with Twitch, enables notifications, starts an IRL stream in their preferred streaming app, and receives audible iOS notifications for Twitch follows, subscriptions, cheers, and raids. When they return to IRL Alert, they can review received events and, while the app is foregrounded, hear native alert audio and TTS through the app queue.
 
-### 4.2. Connection Methods
-To maximize flexibility while keeping the alerts functioning in the background, users must be provided with two distinct connection methods:
+## 4. MVP Objectives
 
-1. **Browser Source URL (Pass-through):** Users can paste their unique Browser Source overlay URL. The app will load this source internally and intercept/play the audio events automatically.
+1. **Twitch-native alert delivery:** Receive supported Twitch EventSub events through a backend relay.
+2. **Background awareness through APNs:** Send visible, audible push notifications to the iPhone when Twitch events arrive.
+3. **Foreground queue and playback:** When the app is active, route alert payloads into the existing FIFO queue, event log, native audio, and TTS flow.
+4. **Real-device diagnostics:** Provide enough app and relay diagnostics to identify where delivery failed.
+5. **Proof-gated implementation:** Do not depend on platform behavior that has not passed an isolated proof harness.
 
-   > **⚠️ iOS Technical Caveat:** On iOS, a `WKWebView` is subject to the same background suspension as Safari. Therefore, the app **cannot** rely on the web view itself staying alive in the background. The implementation must use native-layer workarounds, such as:
-   > - Intercepting WebSocket traffic at the native networking layer (e.g., `URLSessionWebSocketTask`) while parsing the overlay URL to extract the socket token/endpoint.
-   > - Maintaining a silent audio track on the `AVAudioSession` to keep the app process active and prevent OS suspension.
-   > - Using the web view only for initial connection setup / token extraction, then handing off to a native socket connection.
+## 5. Supported Alert Types For MVP
 
-2. **Direct Service Authentication (OAuth):** Users can securely sign in to their respective alert service via OAuth. The app will directly consume the service's API/WebSockets, generating its own native Text-to-Speech (TTS) and triggering alert sound files manually.
+MVP supports Twitch-native events only:
 
-### 4.3. Alert Queuing & Concurrency
-When multiple alerts fire in quick succession (e.g., a raid followed by a flood of subs):
-- Alerts must be **queued and played sequentially** — one at a time, in the order received.
-- A short configurable delay (default ~1 second) is inserted between consecutive alerts to prevent audio overlap.
-- If the queue grows excessively large (e.g., 20+ pending), older alerts beyond a threshold should be summarized or silently logged to prevent an extended playback backlog.
+- Follows
+- Subscriptions
+- Resubscriptions
+- Gift subscriptions
+- Bits / cheers
+- Raids
+- Optional: channel point redemptions, if Twitch scopes and EventSub testing are completed without delaying the core proof
 
-### 4.4. Alert Processing & Presentation
-- **Visual Event Log:** When the app is in the foreground, it should display a clean, readable feed of recent alert events so the streamer can review missed interactive moments.
-- **Audio Output:** Play any associated media/sound files provided by the alert service natively.
-- **Text-to-Speech (TTS):** Utilize device-native text-to-speech to synthesize alert messages (e.g., "JohnDoe just subscribed for 5 months").
+The MVP does not include donations/tips because those require third-party provider integrations such as Streamlabs, StreamElements, or another payment/donation service.
 
-### 4.5. User Settings
-The app must provide the following configurable options:
-- **Alert Volume:** Independent volume slider for alert sounds and TTS, separate from the device master volume.
-- **TTS Toggle:** Enable or disable text-to-speech globally.
-- **TTS Voice Selection:** Allow the user to pick from available system voices.
-- **Alert Type Filters:** Toggle which alert types trigger audio (e.g., disable follow alerts but keep donations).
-- **Queue Overflow Threshold:** Configure the maximum queue size before summarization kicks in.
+## 6. Connection Method
 
-### 4.6. Reconnection & Reliability
-IRL streaming frequently involves unreliable mobile data connections. The app must:
-- **Auto-Reconnect:** Automatically re-establish connections when the network drops, using exponential backoff (e.g., 1s → 2s → 4s → … → max 30s).
-- **Connection Status Indicator:** Display a persistent, at-a-glance indicator (e.g., green dot / red dot) showing the health of each connected alert service.
-- **Offline Queuing:** If the connection drops mid-stream and is restored, any alerts that were missed during the outage should be fetched retroactively if the service API supports it.
-- **Notification on Disconnect:** Optionally send an iOS notification if the alert connection has been down for more than a configurable duration (default 30 seconds), so the streamer is aware.
+### 6.1 Twitch OAuth
 
-## 5. Technical Approach & Constraints
+Users connect Twitch through OAuth. The relay server stores and refreshes Twitch tokens server-side. The app must not store long-lived Twitch access or refresh tokens locally for MVP.
 
-### 5.1. Platform Architecture
-- **Decision:** The project will be developed as a Native iOS app using **Swift / SwiftUI**, supported by a lightweight **backend relay server** (Node.js).
-- **Rationale:** The core requirement of maintaining active WebSocket connections and uninterrupted audio mixing in the background is rigorously restricted by iOS. Cross-platform frameworks like React Native or Flutter frequently experience background thread suspension (meaning their JavaScript/Dart runtimes are paused by the OS) unless carefully bridged to custom native modules. Since the MVP is exclusively iOS-focused, building natively in Swift provides direct, unhindered access to `AVAudioSession`, `AVPictureInPictureController`, and Apple's background execution APIs without the liability of maintaining complex native bridges.
-- A Progressive Web App (PWA) or simple web page will **not** fulfill the strict iOS background execution requirements.
+### 6.2 Relay Device Registration
 
-### 5.2. Background Execution Strategy (iOS specifics)
+After APNs registration, the app sends its device token and app user identifier to the relay. The relay uses this registration to send APNs alerts for normalized Twitch events.
 
-> **⚠️ Critical iOS Constraint:** iOS aggressively suspends apps within ~30 seconds of entering the background, killing WebSocket connections and halting code execution. A silent audio loop to prevent suspension **violates App Store Guideline 2.5.4** ("Playing a blank audio file to keep your app running in the background is not permitted") and will result in App Store rejection.
+### 6.3 Out-Of-Scope MVP Connection Methods
 
-The app uses a **layered degradation strategy** to maintain alert delivery across all app states:
+The MVP does not support:
 
-**Layer 1 — Foreground (lowest latency):**
-- Native WebSocket (`URLSessionWebSocketTask`) connects directly to alert services.
-- Alerts are queued and played immediately via `AVAudioSession` (`.playback`, `.mixWithOthers`).
+- Browser Source URL parsing
+- Streamlabs socket tokens
+- StreamElements tokens
+- SoundAlerts webhooks or sockets
+- Direct iOS WebSocket listening as the background delivery mechanism
 
-**Layer 2 — Picture-in-Picture (background with process alive):**
-- When the app enters the background, it transitions to a small floating PiP window showing the latest alert or a mini status dashboard.
-- iOS grants full background execution to apps displaying PiP content. The WebSocket stays alive and audio plays normally.
-- This is the primary background execution mechanism and is **App Store compliant** when PiP displays meaningful visual content.
+## 7. Alert Processing And Presentation
 
-**Layer 3 — Push Notification Fallback (deep background / terminated):**
-- If PiP is dismissed or the app is terminated, a backend relay server maintains WebSocket connections on behalf of the user.
-- When an alert arrives, the server sends a high-priority Apple Push Notification (APNs) to the device.
-- A Notification Service Extension intercepts the push and plays the alert sound.
+### 7.1 Background / Locked / Terminated
 
-### 5.3. Backend Relay Server
-- A lightweight Node.js server maintains persistent WebSocket connections to Streamlabs, StreamElements, Twitch EventSub, and SoundAlerts on behalf of each registered user.
-- When an alert event is received, the server forwards it as a high-priority APNs payload to the user's device.
-- The server only activates as a fallback when the iOS app's direct WebSocket (Layer 1/2) is not active.
-- **Hosting:** Fly.io (recommended) — ~$2–7/month at launch scale. See Implementation Plan for full cost pathway.
+When the app is backgrounded, locked, or terminated, the MVP delivery path is a visible APNs notification with sound. The app does not promise continuous in-process audio playback in these states.
 
-### 5.4. Audio Session Management
-- The app configures its `AVAudioSession` with category `.playback` and option `.mixWithOthers`. This ensures the OS allows the app's sounds to play seamlessly over the primary streaming app without taking exclusive ownership of the audio hardware.
-- Audio is only played when there is actual alert content to deliver — no silent loops or blank audio files.
+### 7.2 Foreground
 
-## 6. Out of Scope for MVP (V1)
-- **Android support** — iOS is the primary target; Android may follow in a future version.
-- **On-screen overlay rendering** — This app is an audio companion, not a visual overlay on the camera/stream feed. (Note: The PiP window is a small status indicator, not a stream overlay.)
-- Custom CSS injection/editing for Browser Source URLs directly in-app.
-- Video streaming capabilities (this app operates strictly as an alert relayer companion).
-- Custom alert media uploads.
-- Advanced wearable integrations (e.g., Apple Watch companion app).
+When the app is active:
 
+- Incoming alert payloads are deduped.
+- Alerts are persisted to the event log.
+- Alerts enter the FIFO queue.
+- Native audio and TTS play sequentially.
+
+### 7.3 Queue Behavior
+
+When multiple alerts arrive quickly:
+
+- Alerts are queued and processed in received order.
+- A configurable inter-alert delay defaults to about 1 second.
+- If the queue exceeds the configured threshold, excess alerts are skipped or summarized rather than creating an unusable backlog.
+
+## 8. User Settings
+
+MVP settings should include:
+
+- Twitch connection status
+- Push notification permission/status
+- Relay registration status
+- Alert volume for foreground playback
+- TTS enable/disable for foreground playback
+- TTS voice/rate where already supported
+- Alert type filters for supported Twitch event types
+- Queue overflow threshold
+- Diagnostics/export access
+
+PiP settings and silent-audio controls are not part of the MVP user-facing experience.
+
+## 9. Reliability And Diagnostics
+
+The MVP must avoid blind platform testing. Every alert should be traceable through a correlation chain:
+
+```text
+twitch_message_id -> relay_event_id -> apns_id -> ios_received_id -> queue_event_id -> playback_event_id
+```
+
+The app must expose diagnostics for:
+
+- Notification permission state
+- APNs token registration timestamp
+- Relay registration status
+- Last received notification correlation ID
+- Last queued alert correlation ID
+- Last audio/TTS playback state
+- Current audio route/category
+
+The relay must expose diagnostics for:
+
+- Twitch EventSub session state
+- Subscription status
+- Last keepalive timestamp
+- Reconnect count
+- OAuth token refresh state
+- Last normalized alert
+- Last APNs send result
+- APNs response ID where available
+
+## 10. Technical Approach
+
+### 10.1 Platform
+
+- Native iOS app using Swift and SwiftUI
+- Node.js backend relay server
+- Twitch EventSub WebSocket for MVP event ingestion
+- APNs for mobile background/locked/terminated alert delivery
+- Native app queue, event log, audio, and TTS for foreground playback
+
+### 10.2 Background Strategy
+
+iOS may suspend ordinary app execution after backgrounding. Silent audio loops are not acceptable as a shipping strategy, and prior PiP experiments did not become reliable enough to remain on the MVP critical path.
+
+Therefore:
+
+- The relay keeps Twitch EventSub connections alive.
+- APNs provides background/locked/terminated user awareness.
+- The app handles rich queue/audio/TTS behavior when active.
+- PiP remains a post-MVP research topic unless a separate Apple-compliant proof passes independently.
+
+### 10.3 Anti-Guesswork Requirement
+
+No platform-sensitive capability may enter the production MVP path until it has passed:
+
+- An isolated proof harness
+- Observable logs
+- Correlation IDs
+- Pass/fail criteria
+- A documented kill or pivot rule
+
+## 11. Out Of Scope For MVP
+
+- Streamlabs integration
+- StreamElements integration
+- SoundAlerts integration
+- Donations/tips
+- Browser Source URL parsing
+- Custom third-party alert sounds/media
+- PiP background execution
+- Silent audio background execution
+- Android support
+- Apple Watch or Live Activity companion surfaces
+- On-stream visual overlays
+- Video streaming features
+
+## 12. MVP Acceptance Criteria
+
+The MVP is accepted when:
+
+- A user can connect Twitch.
+- The app can register for APNs and relay delivery.
+- Twitch mock or real events reach the relay and normalize correctly.
+- A physical iPhone receives audible APNs notifications while backgrounded or locked.
+- Foreground notifications route into the queue, event log, audio, and TTS once.
+- Reconnect and duplicate-delivery tests do not create duplicate queue entries.
+- Diagnostics can identify whether a failed alert stopped at Twitch, relay, APNs, iOS receipt, queue, or playback.

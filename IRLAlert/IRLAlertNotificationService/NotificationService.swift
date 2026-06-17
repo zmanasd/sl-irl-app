@@ -27,21 +27,8 @@ final class NotificationService: UNNotificationServiceExtension {
             bestAttemptContent.title = "IRL Alert"
             bestAttemptContent.body = "\(username) triggered a \(type)."
         }
-        let soundURLString = alertPayload?["sound_url"] as? String
 
-        guard let soundURLString, let soundURL = URL(string: soundURLString) else {
-            contentHandler(bestAttemptContent)
-            return
-        }
-
-        downloadSound(from: soundURL) { localURL in
-            if let localURL {
-                bestAttemptContent.sound = UNNotificationSound(
-                    named: UNNotificationSoundName(localURL.lastPathComponent)
-                )
-            }
-            contentHandler(bestAttemptContent)
-        }
+        contentHandler(bestAttemptContent)
     }
 
     override func serviceExtensionTimeWillExpire() {
@@ -50,24 +37,4 @@ final class NotificationService: UNNotificationServiceExtension {
         }
     }
 
-    private func downloadSound(from url: URL, completion: @escaping (URL?) -> Void) {
-        let task = URLSession.shared.downloadTask(with: url) { location, _, _ in
-            guard let location else {
-                completion(nil)
-                return
-            }
-
-            let filename = url.lastPathComponent.isEmpty ? "alert_sound.caf" : url.lastPathComponent
-            let destination = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
-            try? FileManager.default.removeItem(at: destination)
-            do {
-                try FileManager.default.moveItem(at: location, to: destination)
-                completion(destination)
-            } catch {
-                completion(nil)
-            }
-        }
-        task.resume()
-    }
 }

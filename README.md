@@ -1,7 +1,25 @@
 # IRL Alert
 
-The Enhanced IRL Alert App solves a critical problem for mobile In-Real-Life (IRL) streamers: missing stream interactions because mobile operating systems often suspend background web browsers, breaking existing WebSocket alert relies. 
+IRL Alert is an iOS companion app for mobile IRL streamers who need reliable Twitch interaction alerts while using another streaming app.
 
-Built natively in Swift and SwiftUI to leverage Apple's `AVAudioSession` and background execution APIs, the app connects directly to major alert services (such as Streamlabs and Twitch) via direct OAuth or by natively parsing Browser Source URLs. When an alert—such as a donation, follow, subscription, host, or raid—is triggered, the app reliably catches it even if the device screen is locked or the predominant streaming app (like Moblin) is active.
+The MVP is now scoped to one proof-first delivery path:
 
-The app acts as an intelligent audio mixing companion. Instead of a visual overlay, it employs a strict FIFO (First-In, First-Out) queuing system to process alerts sequentially, preventing audio overlap. It fetches the required alert sounds, utilizes the device's native Text-to-Speech (TTS) to read out custom alert messages, and mixes this audio seamlessly into the streamer's earpiece alongside their primary stream audio. Additionally, the app features auto-reconnection with exponential backoff for unstable mobile networks, providing a robust, uninterrupted connection to the streamer’s community while out in the real world.
+**Twitch EventSub -> relay server -> APNs -> iPhone alert receipt -> foreground queue/log/audio**
+
+The app no longer treats PiP, silent audio, Browser Source parsing, or multi-provider alert integrations as MVP requirements. Those paths remain post-MVP work until the Twitch-first proof is validated on a real device.
+
+## MVP Behavior
+
+- The relay server maintains Twitch EventSub WebSocket sessions.
+- The relay normalizes Twitch events and sends visible, audible APNs notifications.
+- The iOS app registers its APNs device token with the relay.
+- The iOS Connections screen starts Twitch OAuth through the relay, registers the iPhone, and sends a correlated relay test alert.
+- When the app is foregrounded, alert payloads are deduped, persisted, queued, and played through native audio/TTS.
+- When the app is backgrounded, locked, or terminated, MVP alert awareness comes from iOS notifications rather than continuous in-app execution.
+
+## Anti-Guesswork Rule
+
+No platform-sensitive capability enters the production MVP path until it has passed an isolated proof harness with logs, correlation IDs, pass/fail criteria, and a documented pivot rule.
+
+See `IMPLEMENTATION_PLAN.md` for the active implementation plan.
+Use `docs/MVP_PROOF_CHECKLIST.md` for physical-device validation and evidence capture.

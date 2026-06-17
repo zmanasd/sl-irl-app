@@ -2,7 +2,7 @@ import AVFoundation
 import Combine
 import os.log
 
-/// Manages the AVAudioSession for background audio playback.
+/// Manages the AVAudioSession for foreground alert playback.
 /// Configures the session for `.playback` with `.mixWithOthers` so alert sounds
 /// play over other audio (e.g. Spotify, Apple Music) without pausing them.
 @MainActor
@@ -22,8 +22,8 @@ final class AudioSessionManager: ObservableObject {
     
     // MARK: - Session Configuration
     
-    /// Configure and activate the audio session for background alert playback.
-    /// Must be called early in the app lifecycle (e.g. on app launch).
+    /// Configure and activate the audio session for alert playback while the app is active.
+    /// Must be called before local alert sounds or TTS are played.
     func configureSession() {
         configureAndActivateSession(
             category: .playback,

@@ -1,8 +1,13 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 
 /// Settings screen for configuring app behavior and alerts.
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsVM()
+    @ObservedObject private var pushManager = PushNotificationManager.shared
+    @ObservedObject private var relayClient = RelayClient.shared
+    @State private var diagnosticsCopiedAt: Date?
     
     var body: some View {
         ZStack {
@@ -36,7 +41,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Local Device")
                                 .font(.headline)
-                            Text("IRL Alert Basic")
+                            Text("Twitch MVP Device")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -139,38 +144,318 @@ struct SettingsView: View {
                             step: 0.5,
                             format: { String(format: "%.1fs", $0) }
                         )
-                        
-                        Divider().padding(.leading, 56)
-                        
-                        // Disconnect Timeout
-                        SettingsStepperRow(
-                            icon: "wifi.slash",
-                            iconColor: .indigo,
-                            title: "Disconnect Timeout",
-                            value: $viewModel.disconnectNotificationTimeout,
-                            range: 10...300,
-                            step: 10,
-                            format: { "\(Int($0))s" }
-                        )
                     }
 
-                    // Background & Notifications
-                    SettingsSection(title: "Background & Notifications") {
-                        SettingsToggleRow(
-                            icon: "pip",
-                            iconColor: .purple,
-                            title: "Enable PiP on Background",
-                            isOn: $viewModel.pipEnabled
-                        )
-
-                        Divider().padding(.leading, 56)
-
+                    // Relay & Notifications
+                    SettingsSection(title: "Relay & Notifications") {
                         SettingsToggleRow(
                             icon: "bell.badge.fill",
                             iconColor: .orange,
                             title: "Enable Push Alerts",
                             isOn: $viewModel.pushNotificationsEnabled
                         )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsTextFieldRow(
+                            icon: "server.rack",
+                            iconColor: .indigo,
+                            title: "Relay URL",
+                            text: $viewModel.relayBaseURL,
+                            placeholder: "https://relay.example.com"
+                        )
+                    }
+
+                    SettingsSection(title: "Delivery Diagnostics") {
+                        SettingsInfoRow(
+                            icon: "bell.badge",
+                            iconColor: .orange,
+                            title: "Push Permission",
+                            value: pushManager.authorizationStatus.diagnosticsTitle
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "key.fill",
+                            iconColor: .teal,
+                            title: "APNs Token",
+                            value: deviceTokenStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "calendar.badge.clock",
+                            iconColor: .purple,
+                            title: "Token Updated",
+                            value: formattedDate(pushManager.deviceTokenRegisteredAt)
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "server.rack",
+                            iconColor: .indigo,
+                            title: "Relay URL",
+                            value: RelayClient.shared.diagnosticsBaseURL
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "person.crop.circle.badge.checkmark",
+                            iconColor: .green,
+                            title: "Relay User",
+                            value: shortIdentifier(AppSettings.shared.relayUserId)
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "antenna.radiowaves.left.and.right",
+                            iconColor: .pink,
+                            title: "Relay Register",
+                            value: relayRegistrationStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "tray.and.arrow.down.fill",
+                            iconColor: .blue,
+                            title: "Push Receipts",
+                            value: "\(pushManager.acceptedNotificationCount)/\(pushManager.receivedNotificationCount) accepted"
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "link",
+                            iconColor: .cyan,
+                            title: "Last Correlation",
+                            value: pushManager.lastAcceptedAlert?.externalIdentity ?? "None"
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "paperplane.fill",
+                            iconColor: .blue,
+                            title: "Last Relay Test",
+                            value: relayTestStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "stethoscope",
+                            iconColor: .green,
+                            title: "MVP Readiness",
+                            value: relayReadinessStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "server.rack",
+                            iconColor: .indigo,
+                            title: "Relay Ready",
+                            value: relayClient.lastReadinessSummary
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "stethoscope",
+                            iconColor: .green,
+                            title: "Relay Snapshot",
+                            value: relayDiagnosticsStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "bell.and.waves.left.and.right",
+                            iconColor: .orange,
+                            title: "Relay APNs",
+                            value: relayClient.lastDiagnosticsApnsReadiness
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "iphone.gen3",
+                            iconColor: .teal,
+                            title: "Relay Device",
+                            value: relayClient.lastDiagnosticsDeviceTokenStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "key.viewfinder",
+                            iconColor: .purple,
+                            title: "Twitch OAuth",
+                            value: relayClient.lastDiagnosticsTwitchOAuthReadiness
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "arrow.clockwise.icloud",
+                            iconColor: .green,
+                            title: "Relay Recovery",
+                            value: relayClient.lastDiagnosticsConnectorRecoveryStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "message.fill",
+                            iconColor: .purple,
+                            title: "Twitch Status",
+                            value: relayClient.lastDiagnosticsTwitchStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "arrow.triangle.2.circlepath",
+                            iconColor: .indigo,
+                            title: "Twitch Refresh",
+                            value: relayClient.lastDiagnosticsTwitchRefreshStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "square.stack.3d.down.right",
+                            iconColor: .brown,
+                            title: "Provider Dedupe",
+                            value: relayClient.lastDiagnosticsProviderDedupeStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "shippingbox.fill",
+                            iconColor: .cyan,
+                            title: "Relay Delivery",
+                            value: relayClient.lastDiagnosticsDeliveryStatus
+                        )
+
+                        Divider().padding(.leading, 56)
+
+                        SettingsInfoRow(
+                            icon: "clock.badge.checkmark",
+                            iconColor: .mint,
+                            title: "Last Received",
+                            value: formattedDate(pushManager.lastNotificationReceivedAt)
+                        )
+
+                        if let reason = pushManager.lastDroppedAlertReason {
+                            Divider().padding(.leading, 56)
+
+                            SettingsInfoRow(
+                                icon: "exclamationmark.triangle.fill",
+                                iconColor: .yellow,
+                                title: "Last Drop",
+                                value: reason
+                            )
+                        }
+
+                        if let error = pushManager.lastRegistrationError {
+                            Divider().padding(.leading, 56)
+
+                            SettingsInfoRow(
+                                icon: "xmark.octagon.fill",
+                                iconColor: .red,
+                                title: "APNs Error",
+                                value: error
+                            )
+                        }
+
+                        Divider().padding(.leading, 56)
+
+                        Button {
+                            Task { await pushManager.refreshAuthorizationStatus() }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(icon: "arrow.clockwise", color: .gray)
+                                Text("Refresh Push Status")
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                            }
+                            .padding(16)
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().padding(.leading, 56)
+
+                        Button {
+                            Task { await relayClient.fetchDiagnostics() }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(icon: "stethoscope", color: .green)
+                                Text(relayClient.isFetchingDiagnostics ? "Refreshing Relay Diagnostics" : "Refresh Relay Diagnostics")
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                            }
+                            .padding(16)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(relayClient.isFetchingDiagnostics)
+
+                        Divider().padding(.leading, 56)
+
+                        Button {
+                            Task { await relayClient.fetchReadiness() }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(icon: "checkmark.shield", color: .green)
+                                Text(relayClient.isFetchingReadiness ? "Checking MVP Readiness" : "Check MVP Readiness")
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                            }
+                            .padding(16)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(relayClient.isFetchingReadiness)
+
+                        Divider().padding(.leading, 56)
+
+                        Button {
+                            Task { await relayClient.sendRelayTestAlert() }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(icon: "paperplane", color: .blue)
+                                Text(relayClient.isSendingTestAlert ? "Sending Relay Test" : "Send Relay Test Alert")
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                            }
+                            .padding(16)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(relayClient.isSendingTestAlert)
+
+                        Divider().padding(.leading, 56)
+
+                        Button {
+                            copyDiagnosticsSnapshot()
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(
+                                    icon: diagnosticsCopiedAt == nil ? "doc.on.clipboard" : "checkmark.circle.fill",
+                                    color: diagnosticsCopiedAt == nil ? .gray : .green
+                                )
+                                Text(diagnosticsCopiedAt == nil ? "Copy Diagnostics Snapshot" : "Diagnostics Snapshot Copied")
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                            }
+                            .padding(16)
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     // Alert Types (Filters)
@@ -213,6 +498,94 @@ struct SettingsView: View {
                 .padding(.bottom, 120) // Tab bar clearance
             }
         }
+    }
+
+    private var deviceTokenStatus: String {
+        guard let token = pushManager.deviceToken, !token.isEmpty else { return "Missing" }
+        return "Available \(shortIdentifier(token))"
+    }
+
+    private var relayRegistrationStatus: String {
+        if let error = relayClient.lastRegistrationError {
+            return error
+        }
+
+        if let statusCode = relayClient.lastRegistrationStatusCode {
+            return "HTTP \(statusCode)"
+        }
+
+        if relayClient.lastRegistrationAttemptAt != nil {
+            return "Pending"
+        }
+
+        return "Not attempted"
+    }
+
+    private var relayTestStatus: String {
+        if let error = relayClient.lastTestAlertError {
+            return error
+        }
+
+        if let correlationId = relayClient.lastTestAlertCorrelationId,
+           let statusCode = relayClient.lastTestAlertStatusCode {
+            return "\(shortIdentifier(correlationId)) HTTP \(statusCode)"
+        }
+
+        if relayClient.isSendingTestAlert {
+            return "Sending"
+        }
+
+        return "Not sent"
+    }
+
+    private var relayReadinessStatus: String {
+        if let error = relayClient.lastReadinessError {
+            return error
+        }
+
+        if let statusCode = relayClient.lastReadinessStatusCode {
+            return "\(relayClient.lastUserReadinessSummary) HTTP \(statusCode)"
+        }
+
+        if relayClient.isFetchingReadiness {
+            return "Fetching"
+        }
+
+        return relayClient.lastUserReadinessSummary
+    }
+
+    private var relayDiagnosticsStatus: String {
+        if let error = relayClient.lastDiagnosticsError {
+            return error
+        }
+
+        if let statusCode = relayClient.lastDiagnosticsStatusCode {
+            return "\(relayClient.lastDiagnosticsSummary) HTTP \(statusCode)"
+        }
+
+        if relayClient.isFetchingDiagnostics {
+            return "Fetching"
+        }
+
+        return relayClient.lastDiagnosticsSummary
+    }
+
+    private func shortIdentifier(_ value: String) -> String {
+        guard value.count > 12 else { return value }
+        return "\(value.prefix(6))...\(value.suffix(6))"
+    }
+
+    private func formattedDate(_ date: Date?) -> String {
+        guard let date else { return "Never" }
+        return date.formatted(date: .omitted, time: .standard)
+    }
+
+    private func copyDiagnosticsSnapshot() {
+        UIPasteboard.general.string = viewModel.diagnosticsSnapshot(
+            pushManager: pushManager,
+            relayClient: relayClient
+        )
+        diagnosticsCopiedAt = Date()
     }
 }
 
@@ -338,6 +711,32 @@ struct SettingsStepperRow: View {
     }
 }
 
+struct SettingsInfoRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SettingsIcon(icon: icon, color: iconColor)
+
+            Text(title)
+                .font(.subheadline.weight(.medium))
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(16)
+    }
+}
+
 struct SettingsPickerRow: View {
     let icon: String
     let iconColor: Color
@@ -371,6 +770,47 @@ struct SettingsPickerRow: View {
     }
 }
 
+struct SettingsTextFieldRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                SettingsIcon(icon: icon, color: iconColor)
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+            }
+
+            TextField(placeholder, text: $text)
+                .font(.caption.monospaced())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .padding(12)
+                .background(Color.secondary.opacity(0.06))
+                .cornerRadius(DesignSystem.Radius.small)
+        }
+        .padding(16)
+    }
+}
+
 #Preview {
     SettingsView()
+}
+
+private extension UNAuthorizationStatus {
+    var diagnosticsTitle: String {
+        switch self {
+        case .notDetermined: "Not Asked"
+        case .denied: "Denied"
+        case .authorized: "Authorized"
+        case .provisional: "Provisional"
+        case .ephemeral: "Ephemeral"
+        @unknown default: "Unknown"
+        }
+    }
 }

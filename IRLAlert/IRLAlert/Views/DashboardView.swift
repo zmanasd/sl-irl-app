@@ -1,13 +1,16 @@
 import SwiftUI
 
 /// Main dashboard screen.
-/// Shows quick status overview, connection health, and active stream metrics.
+/// Shows quick MVP proof status and active stream metrics.
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardVM()
-    
+    @EnvironmentObject private var appSettings: AppSettings
+    @ObservedObject private var pushManager = PushNotificationManager.shared
+    @ObservedObject private var relayClient = RelayClient.shared
+
     // Animation state for the pulse rings
     @State private var isPulsing = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -21,7 +24,7 @@ struct DashboardView: View {
                             .font(.title2.bold())
                     }
                     Spacer()
-                    
+
                     // App Icon / Profile
                     ZStack {
                         Circle()
@@ -37,24 +40,24 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
-                
+
                 // Hero Status Section
                 VStack(spacing: 16) {
                     ZStack {
                         // Outer pulse ring 1
                         Circle()
-                            .fill(viewModel.hasActiveConnection ? DesignSystem.Colors.alertGreen.opacity(0.15) : Color.orange.opacity(0.15))
+                            .fill(mvpReady ? DesignSystem.Colors.alertGreen.opacity(0.15) : Color.orange.opacity(0.15))
                             .frame(width: 240, height: 240)
                             .scaleEffect(isPulsing ? 1.2 : 0.8)
                             .opacity(isPulsing ? 0 : 0.6)
-                        
+
                         // Outer pulse ring 2
                         Circle()
-                            .fill(viewModel.hasActiveConnection ? DesignSystem.Colors.alertGreen.opacity(0.10) : Color.orange.opacity(0.10))
+                            .fill(mvpReady ? DesignSystem.Colors.alertGreen.opacity(0.10) : Color.orange.opacity(0.10))
                             .frame(width: 240, height: 240)
                             .scaleEffect(isPulsing ? 1.4 : 0.8)
                             .opacity(isPulsing ? 0 : 0.4)
-                        
+
                         // Main inner circle background
                         Circle()
                             .fill(Color.appCard)
@@ -63,16 +66,16 @@ struct DashboardView: View {
                             .overlay(
                                 Circle().stroke(Color.secondary.opacity(0.1), lineWidth: 8)
                             )
-                        
+
                         // Inner content
                         VStack(spacing: 8) {
-                            Image(systemName: viewModel.hasActiveConnection ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                            Image(systemName: mvpReady ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
                                 .font(.system(size: 48, weight: .light))
-                                .foregroundStyle(viewModel.hasActiveConnection ? DesignSystem.Colors.alertGreen : Color.orange)
-                            
-                            Text(viewModel.hasActiveConnection ? "Active" : "Standby")
+                                .foregroundStyle(mvpReady ? DesignSystem.Colors.alertGreen : Color.orange)
+
+                            Text(mvpReady ? "Ready" : "Setup")
                                 .font(.title3.bold())
-                                .foregroundStyle(viewModel.hasActiveConnection ? DesignSystem.Colors.alertGreen : Color.orange)
+                                .foregroundStyle(mvpReady ? DesignSystem.Colors.alertGreen : Color.orange)
                         }
                     }
                     .padding(.vertical, 20)
@@ -81,50 +84,53 @@ struct DashboardView: View {
                             isPulsing = true
                         }
                     }
-                    
+
                     VStack(spacing: 4) {
-                        Text(viewModel.hasActiveConnection ? "System Online" : "Waiting for Connection")
+                        Text(mvpReady ? "Twitch Relay Ready" : "MVP Setup Required")
                             .font(.headline)
-                        Text(viewModel.hasActiveConnection ? "Monitoring \(viewModel.activeServiceCount) connected services" : "No active alert sources")
+                        Text(mvpReady ? "Twitch EventSub, relay, and APNs are proof-ready" : "Connect Twitch, register this iPhone, then check MVP readiness")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
-                
-                // Service Connectivity Grid
+
+                // MVP Proof Readiness
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("SERVICE CONNECTIVITY")
+                    Text("MVP PROOF READINESS")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 24)
-                    
+
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            ServiceStatusCard(
-                                title: "Streamlabs",
-                                icon: "bolt.fill",
-                                color: .teal,
-                                state: viewModel.serviceStates[.streamlabs] ?? .disconnected
-                            )
-                            
-                            ServiceStatusCard(
+                            ProofStatusCard(
                                 title: "Twitch",
                                 icon: "message.fill",
                                 color: .purple,
-                                state: viewModel.serviceStates[.twitchNative] ?? .disconnected
+                                statusText: relayClient.twitchReadinessLabel,
+                                isReady: relayClient.twitchEventSubReady
                             )
-                            
-                            ServiceStatusCard(
-                                title: "StreamElements",
-                                icon: "cup.and.saucer.fill",
+
+                            ProofStatusCard(
+                                title: "APNs",
+                                icon: "bell.badge.fill",
+                                color: .orange,
+                                statusText: pushManager.deviceToken == nil ? "Missing" : "Ready",
+                                isReady: pushManager.deviceToken != nil
+                            )
+
+                            ProofStatusCard(
+                                title: "Relay",
+                                icon: "server.rack",
                                 color: .blue,
-                                state: viewModel.serviceStates[.streamElements] ?? .disconnected
+                                statusText: relayRegistrationText,
+                                isReady: relayRegistrationReady
                             )
                         }
                         .padding(.horizontal, 24)
                     }
                 }
-                
+
                 // Metrics Grid
                 HStack(spacing: 16) {
                     MetricCard(
@@ -137,7 +143,7 @@ struct DashboardView: View {
                         subIcon: viewModel.isProcessing ? "waveform.path.ecg" : "moon.zzz",
                         subColor: viewModel.isProcessing ? DesignSystem.Colors.alertGreen : .secondary
                     )
-                    
+
                     MetricCard(
                         title: "PROCESSED",
                         icon: "checkmark.circle.fill",
@@ -150,24 +156,24 @@ struct DashboardView: View {
                     )
                 }
                 .padding(.horizontal, 24)
-                
+
                 // Session Card
                 VStack(spacing: 0) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Session Details")
                                 .font(.headline)
-                            Text("Active connection metrics")
+                            Text("Current proof-session metrics")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                     }
                     .padding()
-                    
+
                     Divider()
                         .padding(.leading)
-                    
+
                     HStack {
                         Text("Uptime")
                             .foregroundStyle(.secondary)
@@ -183,22 +189,38 @@ struct DashboardView: View {
                 .cornerRadius(DesignSystem.Radius.large)
                 .shadow(color: Color.black.opacity(0.05), radius: 10, y: 4)
                 .padding(.horizontal, 24)
-                
+
             }
             .padding(.bottom, 100) // Account for floating tab bar
         }
-        .background(Color.appBackground)
+                .background(Color.appBackground)
+    }
+
+    private var relayRegistrationReady: Bool {
+        guard let statusCode = relayClient.lastRegistrationStatusCode else { return false }
+        return (200..<300).contains(statusCode)
+    }
+
+    private var relayRegistrationText: String {
+        guard let statusCode = relayClient.lastRegistrationStatusCode else { return "Pending" }
+        return "HTTP \(statusCode)"
+    }
+
+    private var mvpReady: Bool {
+        appSettings.pushNotificationsEnabled && pushManager.deviceToken != nil && relayRegistrationReady
+            && relayClient.twitchEventSubReady
     }
 }
 
 // MARK: - Subcomponents
 
-struct ServiceStatusCard: View {
+struct ProofStatusCard: View {
     let title: String
     let icon: String
     let color: Color
-    let state: ConnectionState
-    
+    let statusText: String
+    let isReady: Bool
+
     var body: some View {
         VStack(spacing: 10) {
             ZStack {
@@ -209,18 +231,20 @@ struct ServiceStatusCard: View {
                     .font(.system(size: 20))
                     .foregroundStyle(color)
             }
-            
+
             Text(title)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
-            
+
             HStack(spacing: 4) {
                 Circle()
-                    .fill(statusColor)
+                    .fill(isReady ? DesignSystem.Colors.alertGreen : Color.orange)
                     .frame(width: 8, height: 8)
                 Text(statusText)
                     .font(.system(size: 12, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
         .frame(width: 110)
@@ -233,24 +257,6 @@ struct ServiceStatusCard: View {
                 .stroke(Color.secondary.opacity(0.05), lineWidth: 1)
         )
     }
-    
-    private var statusColor: Color {
-        switch state {
-        case .connected: return DesignSystem.Colors.alertGreen
-        case .connecting, .reconnecting: return Color.orange
-        case .failed: return Color.red
-        case .disconnected: return Color.secondary.opacity(0.4)
-        }
-    }
-    
-    private var statusText: String {
-        switch state {
-        case .connected: return "Online"
-        case .connecting, .reconnecting: return "Syncing"
-        case .failed: return "Error"
-        case .disconnected: return "Offline"
-        }
-    }
 }
 
 struct MetricCard: View {
@@ -262,7 +268,7 @@ struct MetricCard: View {
     let subtext: String
     let subIcon: String
     let subColor: Color
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -272,7 +278,7 @@ struct MetricCard: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
-            
+
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 32, weight: .bold))
@@ -280,7 +286,7 @@ struct MetricCard: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
             }
-            
+
             HStack(spacing: 4) {
                 Image(systemName: subIcon)
                     .font(.system(size: 10))

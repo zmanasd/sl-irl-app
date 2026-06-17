@@ -1,8 +1,7 @@
 import AVFoundation
 import os.log
 
-/// Plays alert sound files through AVAudioPlayer.
-/// Supports both local and remote URLs (remote files are fetched via MediaCacheManager).
+/// Plays local alert sound files through AVAudioPlayer.
 @MainActor
 final class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
@@ -20,24 +19,15 @@ final class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDeleg
     
     // MARK: - Public API
     
-    /// Play a sound from a URL. If the URL is remote, it will be downloaded and cached first.
+    /// Play a sound from a local file URL.
     /// - Parameters:
-    ///   - url: Local or remote URL of the sound file
+    ///   - url: Local URL of the sound file
     ///   - volume: Playback volume (0.0 to 1.0)
     ///   - completion: Called when playback finishes or fails
     func playSound(from url: URL, volume: Float = 1.0, completion: @escaping () -> Void) {
         Task {
-            let localURL: URL?
-            
-            if url.isFileURL {
-                localURL = url
-            } else {
-                // Download and cache remote sound
-                localURL = await MediaCacheManager.shared.localURL(for: url)
-            }
-            
-            guard let fileURL = localURL else {
-                logger.error("Could not resolve sound URL: \(url.absoluteString)")
+            guard url.isFileURL else {
+                logger.error("Remote alert sound URLs are post-MVP: \(url.absoluteString)")
                 completion()
                 return
             }
@@ -46,7 +36,7 @@ final class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDeleg
                 // Stop any existing playback
                 stopCurrentPlayback()
                 
-                let player = try AVAudioPlayer(contentsOf: fileURL)
+                let player = try AVAudioPlayer(contentsOf: url)
                 player.delegate = self
                 player.volume = volume
                 player.prepareToPlay()
@@ -56,7 +46,7 @@ final class AudioPlaybackService: NSObject, ObservableObject, AVAudioPlayerDeleg
                 self.isPlaying = true
                 
                 if player.play() {
-                    logger.info("Playing sound: \(fileURL.lastPathComponent)")
+                    logger.info("Playing sound: \(url.lastPathComponent)")
                 } else {
                     logger.error("AVAudioPlayer.play() returned false")
                     self.isPlaying = false

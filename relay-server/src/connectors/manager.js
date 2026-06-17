@@ -1,75 +1,18 @@
-import { StreamlabsConnector } from "./streamlabs.js";
-import { StreamElementsConnector } from "./streamelements.js";
-import { TwitchEventSubConnector } from "./twitch.js";
-
 export class RelayConnectorManager {
   constructor({ registry, logger, sendAlert }) {
     this.registry = registry;
     this.logger = logger;
     this.sendAlert = sendAlert;
     this.connectors = new Map();
+    this.lastSyncAllAt = null;
+    this.lastSyncAllResults = [];
   }
 
-  syncForUser(userId) {
+  async syncForUser(userId) {
     const record = this.registry.get(userId);
     if (!record) return;
 
     const credentials = Array.isArray(record.credentials) ? record.credentials : [];
-    for (const credential of credentials) {
-      if (credential.service !== "streamlabs") continue;
-      const token = credential.type === "socket" ? credential.value : null;
-      if (!token) continue;
-
-      const key = `${userId}:streamlabs`;
-      if (this.connectors.has(key)) {
-        const existing = this.connectors.get(key);
-        if (existing?.token === token) continue;
-        existing?.stop();
-        this.connectors.delete(key);
-      }
-
-      const connector = new StreamlabsConnector({
-        userId,
-        token,
-        logger: this.logger,
-        onAlert: (alert) => this.handleAlert(userId, alert)
-      });
-
-      connector.start();
-      this.connectors.set(key, connector);
-    }
-
-    for (const credential of credentials) {
-      if (credential.service !== "stream_elements") continue;
-
-      let tokenType = null;
-      if (credential.type === "oauth") tokenType = "oauth";
-      if (credential.type === "jwt") tokenType = "jwt";
-      if (credential.type === "socket") tokenType = "apikey";
-
-      const token = credential.value;
-      if (!token || !tokenType) continue;
-
-      const key = `${userId}:stream_elements`;
-      if (this.connectors.has(key)) {
-        const existing = this.connectors.get(key);
-        if (existing?.token === token && existing?.tokenType === tokenType) continue;
-        existing?.stop();
-        this.connectors.delete(key);
-      }
-
-      const connector = new StreamElementsConnector({
-        userId,
-        token,
-        tokenType,
-        logger: this.logger,
-        onAlert: (alert) => this.handleAlert(userId, alert)
-      });
-
-      connector.start();
-      this.connectors.set(key, connector);
-    }
-
     for (const credential of credentials) {
       if (credential.service !== "twitch_native") continue;
       if (credential.type !== "oauth") continue;
@@ -83,6 +26,7 @@ export class RelayConnectorManager {
         this.connectors.delete(key);
       }
 
+      const { TwitchEventSubConnector } = await import("./twitch.js");
       const connector = new TwitchEventSubConnector({
         userId,
         token: credential.value,
@@ -91,26 +35,99 @@ export class RelayConnectorManager {
         onAlert: (alert) => this.handleAlert(userId, alert)
       });
 
-      connector.start();
+      await connector.start();
       this.connectors.set(key, connector);
     }
+  }
+
+  async syncAllUsers() {
+    const userIds = typeof this.registry.userIds === "function" ? this.registry.userIds() : [];
+    const results = [];
+
+    for (const userId of userIds) {
+      try {
+        await this.syncForUser(userId);
+        results.push({ userId, ok: true });
+      } catch (error) {
+        this.logger.error({ userId, error: error?.message }, "Failed to sync relay connectors for user.");
+        results.push({
+          userId,
+          ok: false,
+          error: error?.message ?? "Connector sync failed."
+        });
+      }
+    }
+
+    this.lastSyncAllAt = new Date().toISOString();
+    this.lastSyncAllResults = results.slice(-50);
+    return results;
+  }
+
+  diagnostics() {
+    return Array.from(this.connectors.entries()).map(([key, connector]) => {
+      if (typeof connector.diagnostics === "function") {
+        return {
+          key,
+          ...connector.diagnostics()
+        };
+      }
+
+      return {
+        key,
+        service: key.split(":").slice(1).join(":"),
+        hasDiagnostics: false
+      };
+    });
+  }
+
+  recoveryDiagnostics() {
+    return {
+      lastSyncAllAt: this.lastSyncAllAt,
+      syncedUsers: this.lastSyncAllResults.filter((result) => result.ok).length,
+      failedUsers: this.lastSyncAllResults.filter((result) => !result.ok).length,
+      results: this.lastSyncAllResults
+    };
   }
 
   async handleAlert(userId, alert) {
     const record = this.registry.get(userId);
     if (!record) return;
 
-    if (record.directConnectionActive) {
-      this.logger.info({ userId }, "Skipping push; direct connection active.");
+    const providerMessage = this.registry.reserveProviderMessage({ userId, alert });
+    if (providerMessage.duplicate) {
+      this.logger.info(
+        { userId, providerMessageId: providerMessage.providerMessageId },
+        "Skipping duplicate provider message."
+      );
+      this.registry.recordDeliveryAttempt({
+        userId,
+        alert,
+        status: "duplicate_provider_message",
+        deviceToken: record.deviceToken
+      });
       return;
     }
 
     try {
-      await this.sendAlert({
+      const result = await this.sendAlert({
         deviceToken: record.deviceToken,
         alert
       });
+      this.registry.recordDeliveryAttempt({
+        userId,
+        alert,
+        status: result?.ok ? "sent" : "failed",
+        result,
+        deviceToken: record.deviceToken
+      });
     } catch (error) {
+      this.registry.recordDeliveryAttempt({
+        userId,
+        alert,
+        status: "failed",
+        error,
+        deviceToken: record.deviceToken
+      });
       this.logger.error({ userId, error: error?.message }, "Failed to forward alert.");
     }
   }

@@ -11,9 +11,17 @@ final class PushNotificationManager: NSObject, ObservableObject {
 
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var deviceToken: String?
+    @Published private(set) var deviceTokenRegisteredAt: Date?
+    @Published private(set) var lastRegistrationError: String?
+    @Published private(set) var receivedNotificationCount = 0
+    @Published private(set) var acceptedNotificationCount = 0
+    @Published private(set) var droppedNotificationCount = 0
+    @Published private(set) var lastNotificationReceivedAt: Date?
+    @Published private(set) var lastAcceptedAlert: AlertEvent?
+    @Published private(set) var lastDroppedAlertReason: String?
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "PushNotificationManager")
-    private var processedAlertIds = Set<String>()
+    private var processedExternalIds = Set<String>()
 
     override init() {
         super.init()
@@ -27,8 +35,7 @@ final class PushNotificationManager: NSObject, ObservableObject {
         if enabled {
             await requestAuthorizationAndRegister()
             if let token = deviceToken {
-                let services = ConnectionManager.shared.registeredServiceIdentifiers()
-                await RelayClient.shared.registerIfPossible(deviceToken: token, services: services)
+                await RelayClient.shared.registerIfPossible(deviceToken: token, services: [.twitchNative])
             }
         } else {
             UIApplication.shared.unregisterForRemoteNotifications()
@@ -64,15 +71,17 @@ final class PushNotificationManager: NSObject, ObservableObject {
     func handleDeviceToken(_ tokenData: Data) {
         let token = tokenData.map { String(format: "%02x", $0) }.joined()
         deviceToken = token
+        deviceTokenRegisteredAt = Date()
+        lastRegistrationError = nil
         logger.info("APNs device token: \(token, privacy: .private)")
 
         Task {
-            let services = ConnectionManager.shared.registeredServiceIdentifiers()
-            await RelayClient.shared.registerIfPossible(deviceToken: token, services: services)
+            await RelayClient.shared.registerIfPossible(deviceToken: token, services: [.twitchNative])
         }
     }
 
     func handleFailedToRegister(_ error: Error) {
+        lastRegistrationError = error.localizedDescription
         logger.error("APNs registration failed: \(error.localizedDescription)")
     }
 
@@ -80,7 +89,17 @@ final class PushNotificationManager: NSObject, ObservableObject {
 
     @discardableResult
     func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> AlertEvent? {
-        guard let event = parseAlertEvent(from: userInfo) else { return nil }
+        receivedNotificationCount += 1
+        lastNotificationReceivedAt = Date()
+
+        guard let event = parseAlertEvent(from: userInfo) else {
+            droppedNotificationCount += 1
+            return nil
+        }
+
+        acceptedNotificationCount += 1
+        lastAcceptedAlert = event
+        lastDroppedAlertReason = nil
         AlertQueueManager.shared.enqueue(event)
         Task { await EventStore.shared.add(event) }
         return event
@@ -89,47 +108,62 @@ final class PushNotificationManager: NSObject, ObservableObject {
     private func parseAlertEvent(from userInfo: [AnyHashable: Any]) -> AlertEvent? {
         let payload = (userInfo["alert"] as? [AnyHashable: Any]) ?? userInfo
 
-        let alertId = stringValue("alert_id", in: payload) ?? stringValue("id", in: payload)
-        if !shouldProcessAlert(id: alertId) { return nil }
+        let correlationId = stringValue("correlationId", in: payload)
+            ?? stringValue("correlation_id", in: payload)
+            ?? stringValue("correlationId", in: userInfo)
+            ?? stringValue("correlation_id", in: userInfo)
+        let providerMessageId = stringValue("providerMessageId", in: payload)
+            ?? stringValue("provider_message_id", in: payload)
+            ?? stringValue("providerMessageId", in: userInfo)
+            ?? stringValue("provider_message_id", in: userInfo)
+            ?? stringValue("alert_id", in: payload)
+            ?? stringValue("id", in: payload)
+        if !shouldProcessAlert(correlationId: correlationId, providerMessageId: providerMessageId) {
+            lastDroppedAlertReason = "Duplicate external ID"
+            return nil
+        }
 
         guard let typeRaw = stringValue("type", in: payload) ?? stringValue("alert_type", in: payload),
               let type = AlertType(rawValue: typeRaw.lowercased()) else {
             logger.warning("Push payload missing alert type.")
+            lastDroppedAlertReason = "Missing or unknown alert type"
             return nil
         }
 
         guard let username = stringValue("username", in: payload) ?? stringValue("user", in: payload) else {
             logger.warning("Push payload missing username.")
+            lastDroppedAlertReason = "Missing username"
             return nil
         }
 
         let message = stringValue("message", in: payload)
         let amount = doubleValue("amount", in: payload)
         let formattedAmount = stringValue("formatted_amount", in: payload)
-        let soundURL = urlValue("sound_url", in: payload)
 
         let timestamp = dateValue("timestamp", in: payload) ?? Date()
-        let sourceRaw = stringValue("source", in: payload) ?? "streamlabs"
-        let source = AlertEvent.AlertSource(rawValue: sourceRaw) ?? .streamlabs
+        let sourceRaw = stringValue("source", in: payload) ?? "twitch_native"
+        let source = AlertEvent.AlertSource(rawValue: sourceRaw) ?? .twitchNative
 
         return AlertEvent(
+            correlationId: correlationId,
+            providerMessageId: providerMessageId,
             type: type,
             username: username,
             message: message,
             amount: amount,
             formattedAmount: formattedAmount,
-            soundURL: soundURL,
             timestamp: timestamp,
             source: source
         )
     }
 
-    private func shouldProcessAlert(id: String?) -> Bool {
-        guard let id, !id.isEmpty else { return true }
-        if processedAlertIds.contains(id) { return false }
-        processedAlertIds.insert(id)
-        if processedAlertIds.count > 200 {
-            processedAlertIds = Set(processedAlertIds.suffix(100))
+    private func shouldProcessAlert(correlationId: String?, providerMessageId: String?) -> Bool {
+        let externalId = correlationId ?? providerMessageId
+        guard let externalId, !externalId.isEmpty else { return true }
+        if processedExternalIds.contains(externalId) { return false }
+        processedExternalIds.insert(externalId)
+        if processedExternalIds.count > 200 {
+            processedExternalIds = Set(processedExternalIds.suffix(100))
         }
         return true
     }
@@ -145,11 +179,6 @@ final class PushNotificationManager: NSObject, ObservableObject {
         if let value = payload[key] as? Int { return Double(value) }
         if let value = payload[key] as? String { return Double(value) }
         return nil
-    }
-
-    private func urlValue(_ key: String, in payload: [AnyHashable: Any]) -> URL? {
-        guard let urlString = stringValue(key, in: payload) else { return nil }
-        return URL(string: urlString)
     }
 
     private func dateValue(_ key: String, in payload: [AnyHashable: Any]) -> Date? {

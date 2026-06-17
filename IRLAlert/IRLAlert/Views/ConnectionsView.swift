@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Main view for managing active service connections.
-/// Allows the user to configure and monitor their alert sources.
+/// Main view for Twitch relay setup, iPhone registration, and delivery diagnostics.
 struct ConnectionsView: View {
     @StateObject private var viewModel = ConnectionsVM()
-    @State private var showingStreamlabsInput = false
+    @ObservedObject private var pushManager = PushNotificationManager.shared
+    @ObservedObject private var relayClient = RelayClient.shared
+    @EnvironmentObject private var appSettings: AppSettings
+    @Environment(\.openURL) private var openURL
     
     var body: some View {
         ZStack {
@@ -22,10 +24,12 @@ struct ConnectionsView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
                     
-                    // Connection Status Banner
-                    StatusBanner(
-                        hasActive: viewModel.hasActiveConnection,
-                        activeCount: viewModel.activeServiceCount
+                    // MVP Status Banner
+                    MVPStatusBanner(
+                        pushEnabled: appSettings.pushNotificationsEnabled,
+                        hasDeviceToken: pushManager.deviceToken != nil,
+                        relayStatus: relayRegistrationStatus,
+                        twitchReady: relayClient.twitchEventSubReady
                     )
                     .padding(.horizontal, 24)
                     
@@ -49,113 +53,100 @@ struct ConnectionsView: View {
                         .padding(.horizontal, 24)
                     }
                     
-                    // Sync Services Grid
+                    // Twitch MVP proof setup
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text("SYNC SERVICES")
+                            Text("TWITCH MVP SETUP")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.secondary)
                                 .tracking(1.0)
                             
                             Spacer()
                             
-                            Text("\(viewModel.activeServiceCount) Active")
+                            Text("Proof-first")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(DesignSystem.Colors.primaryBlue)
                         }
                         .padding(.horizontal, 24)
                         
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                            ServiceGridCard(
-                                title: "Streamlabs",
-                                subtitle: "Socket or URL",
-                                icon: "bolt.fill",
-                                color: .teal,
-                                state: viewModel.serviceStates[.streamlabs] ?? .disconnected
+                        VStack(spacing: 12) {
+                            MVPConnectionActionRow(
+                                icon: "message.fill",
+                                iconColor: .purple,
+                                title: "Connect Twitch",
+                                subtitle: twitchOAuthSubtitle,
+                                isLoading: relayClient.isStartingTwitchOAuth
                             ) {
-                                if viewModel.serviceStates[.streamlabs] == .connected || viewModel.serviceStates[.streamlabs] == .connecting {
-                                    viewModel.disconnect(.streamlabs)
-                                } else {
-                                    showingStreamlabsInput = true
+                                Task {
+                                    if let url = await viewModel.createTwitchOAuthURL() {
+                                        openURL(url)
+                                    }
                                 }
                             }
                             
-                            // Twitch Card (Placeholder for Phase 5)
-                            ServiceGridCard(
-                                title: "Twitch",
-                                subtitle: "OAuth Linked",
-                                icon: "message.fill",
-                                color: .purple,
-                                state: viewModel.serviceStates[.twitchNative] ?? .disconnected
-                            ) { }
-                            
-                            // StreamElements Card (Placeholder for Phase 5)
-                            ServiceGridCard(
-                                title: "HyperChat",
-                                subtitle: "WebSocket",
-                                icon: "cup.and.saucer.fill",
-                                color: .blue,
-                                state: viewModel.serviceStates[.streamElements] ?? .disconnected
-                            ) { }
-                            
-                            // SoundAlerts Card (Placeholder for Phase 5)
-                            ServiceGridCard(
-                                title: "SoundAlerts",
-                                subtitle: "Browser Source",
-                                icon: "speaker.wave.3.fill",
-                                color: .orange,
-                                state: viewModel.serviceStates[.soundAlerts] ?? .disconnected
-                            ) { }
+                            MVPConnectionActionRow(
+                                icon: "iphone.radiowaves.left.and.right",
+                                iconColor: .orange,
+                                title: "Register This iPhone",
+                                subtitle: deviceRegistrationSubtitle,
+                                isLoading: false
+                            ) {
+                                Task { await viewModel.registerDeviceForMVP() }
+                            }
+
+                            MVPConnectionActionRow(
+                                icon: "paperplane.fill",
+                                iconColor: .blue,
+                                title: "Send Relay Test Alert",
+                                subtitle: relayTestSubtitle,
+                                isLoading: relayClient.isSendingTestAlert
+                            ) {
+                                Task { await viewModel.sendRelayTestAlert() }
+                            }
+
+                            MVPConnectionActionRow(
+                                icon: "checkmark.shield.fill",
+                                iconColor: .green,
+                                title: "Check MVP Readiness",
+                                subtitle: relayReadinessSubtitle,
+                                isLoading: relayClient.isFetchingReadiness
+                            ) {
+                                Task { await viewModel.refreshRelayReadiness() }
+                            }
+
+                            MVPConnectionActionRow(
+                                icon: "stethoscope",
+                                iconColor: .teal,
+                                title: "Refresh Relay Diagnostics",
+                                subtitle: relayDiagnosticsSubtitle,
+                                isLoading: relayClient.isFetchingDiagnostics
+                            ) {
+                                Task { await viewModel.refreshRelayDiagnostics() }
+                            }
                         }
                         .padding(.horizontal, 24)
                     }
                     
-                    // Quick Connect Helpers
+                    // Relay Details
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("QUICK CONNECT")
+                        Text("RELAY DETAILS")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
                             .tracking(1.0)
                             .padding(.horizontal, 24)
                         
                         VStack(spacing: 12) {
-                            Button {} label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "qrcode.viewfinder")
-                                        .font(.title3)
-                                    Text("Scan Browser URL QR Code")
-                                        .font(.body.weight(.semibold))
-                                    Spacer()
-                                }
-                                .padding()
-                                .frame(height: 56)
-                                .background(Color.appCard)
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            .foregroundStyle(.primary)
-                            
-                            Button {} label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "macbook.and.iphone")
-                                        .font(.title3)
-                                    Text("Find Devices on Setup Network")
-                                        .font(.body.weight(.semibold))
-                                    Spacer()
-                                }
-                                .padding()
-                                .frame(height: 56)
-                                .background(Color.appCard)
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            .foregroundStyle(.primary)
+                            MVPInfoRow(title: "Relay URL", value: appSettings.relayBaseURL)
+                            MVPInfoRow(title: "Relay User", value: shortIdentifier(appSettings.relayUserId))
+                            MVPInfoRow(title: "APNs Token", value: pushManager.deviceToken == nil ? "Missing" : "Available")
+                            MVPInfoRow(title: "Last Correlation", value: pushManager.lastAcceptedAlert?.externalIdentity ?? relayClient.lastTestAlertCorrelationId ?? "None")
+                            MVPInfoRow(title: "MVP Readiness", value: relayClient.lastUserReadinessSummary)
+                            MVPInfoRow(title: "Relay Ready", value: relayClient.lastReadinessSummary)
+                            MVPInfoRow(title: "Relay Snapshot", value: relayClient.lastDiagnosticsSummary)
+                            MVPInfoRow(title: "Relay APNs", value: relayClient.lastDiagnosticsApnsReadiness)
+                            MVPInfoRow(title: "Twitch OAuth", value: relayClient.lastDiagnosticsTwitchOAuthReadiness)
+                            MVPInfoRow(title: "Twitch Status", value: relayClient.lastDiagnosticsTwitchStatus)
+                            MVPInfoRow(title: "Last Delivery", value: relayClient.lastDiagnosticsDeliveryStatus)
                         }
                         .padding(.horizontal, 24)
                     }
@@ -163,53 +154,89 @@ struct ConnectionsView: View {
                 .padding(.bottom, 120) // Tab bar clearance
             }
         }
-        // Streamlabs Input Sheet
-        .sheet(isPresented: $showingStreamlabsInput) {
-            StreamlabsInputSheet(
-                token: $viewModel.streamlabsInput,
-                isConnecting: viewModel.isConnecting[.streamlabs] ?? false,
-                cancel: { showingStreamlabsInput = false },
-                connect: {
-                    Task {
-                        await viewModel.connectStreamlabs()
-                        showingStreamlabsInput = false
-                    }
-                }
-            )
-            .presentationDetents([.height(300)])
-            .presentationDragIndicator(.visible)
+    }
+
+    private var relayRegistrationStatus: String {
+        if let error = relayClient.lastRegistrationError { return error }
+        if let statusCode = relayClient.lastRegistrationStatusCode { return "HTTP \(statusCode)" }
+        return "Not registered"
+    }
+
+    private var twitchOAuthSubtitle: String {
+        if let error = relayClient.lastTwitchOAuthError { return error }
+        if let date = relayClient.lastTwitchOAuthStartedAt {
+            return "Started \(date.formatted(date: .omitted, time: .shortened))"
         }
+        return "Open Twitch authorization through the relay"
+    }
+
+    private var deviceRegistrationSubtitle: String {
+        if let error = relayClient.lastRegistrationError { return error }
+        if let date = relayClient.lastRegistrationSucceededAt {
+            return "Registered \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        if pushManager.deviceToken == nil {
+            return "Request APNs permission and send token to relay"
+        }
+        return "Send current APNs token to relay"
+    }
+
+    private var relayTestSubtitle: String {
+        if let error = relayClient.lastTestAlertError { return error }
+        if let correlationId = relayClient.lastTestAlertCorrelationId {
+            return shortIdentifier(correlationId)
+        }
+        return "Exercise relay -> APNs -> iPhone delivery"
+    }
+
+    private var relayReadinessSubtitle: String {
+        if let error = relayClient.lastReadinessError { return error }
+        if let date = relayClient.lastReadinessFetchedAt {
+            return "Checked \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        return "Verify Twitch EventSub, OAuth, APNs, and this relay user"
+    }
+
+    private var relayDiagnosticsSubtitle: String {
+        if let error = relayClient.lastDiagnosticsError { return error }
+        if let date = relayClient.lastDiagnosticsFetchedAt {
+            return "Fetched \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        return "Compare relay state with this iPhone"
+    }
+
+    private func shortIdentifier(_ value: String) -> String {
+        guard value.count > 12 else { return value }
+        return "\(value.prefix(6))...\(value.suffix(6))"
     }
 }
 
 // MARK: - Subcomponents
 
-struct StatusBanner: View {
-    let hasActive: Bool
-    let activeCount: Int
-    
+struct MVPStatusBanner: View {
+    let pushEnabled: Bool
+    let hasDeviceToken: Bool
+    let relayStatus: String
+    let twitchReady: Bool
+
+    private var isReady: Bool {
+        pushEnabled && hasDeviceToken && relayStatus.hasPrefix("HTTP 2") && twitchReady
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    ZStack {
-                        if hasActive {
-                            Circle()
-                                .fill(DesignSystem.Colors.alertGreen.opacity(0.4))
-                                .frame(width: 8, height: 8)
-                                .scaleEffect(1.5)
-                                .animation(.easeInOut(duration: 1).repeatForever(autoreverses: false), value: hasActive)
-                        }
-                        Circle()
-                            .fill(hasActive ? DesignSystem.Colors.alertGreen : Color.secondary)
-                            .frame(width: 8, height: 8)
-                    }
-                    Text(hasActive ? "BACKGROUND SYNC ACTIVE" : "SYNC INACTIVE")
+                    Circle()
+                        .fill(isReady ? DesignSystem.Colors.alertGreen : Color.orange)
+                        .frame(width: 8, height: 8)
+                    Text(isReady ? "MVP PROOF READY" : "SETUP REQUIRED")
                         .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(hasActive ? DesignSystem.Colors.alertGreen : .secondary)
+                        .foregroundStyle(isReady ? DesignSystem.Colors.alertGreen : Color.orange)
                         .tracking(1.0)
                 }
-                Text("App is monitoring event streams via background socket connection for instant auditory alerts.")
+
+                Text("MVP delivery requires Twitch EventSub diagnostics, relay registration, and APNs on this iPhone.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -217,123 +244,94 @@ struct StatusBanner: View {
             Spacer()
         }
         .padding(16)
-        .background(hasActive ? DesignSystem.Colors.alertGreen.opacity(0.05) : Color.secondary.opacity(0.05))
+        .background(isReady ? DesignSystem.Colors.alertGreen.opacity(0.05) : Color.orange.opacity(0.07))
         .cornerRadius(DesignSystem.Radius.medium)
         .overlay(
             RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
-                .stroke(hasActive ? DesignSystem.Colors.alertGreen.opacity(0.15) : Color.secondary.opacity(0.1), lineWidth: 1)
+                .stroke(isReady ? DesignSystem.Colors.alertGreen.opacity(0.15) : Color.orange.opacity(0.15), lineWidth: 1)
         )
     }
 }
 
-struct ServiceGridCard: View {
+struct MVPConnectionActionRow: View {
+    let icon: String
+    let iconColor: Color
     let title: String
     let subtitle: String
-    let icon: String
-    let color: Color
-    let state: ConnectionState
+    let isLoading: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(color.opacity(0.1))
-                            .frame(width: 40, height: 40)
-                        Image(systemName: icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(color)
-                    }
-                    Spacer()
-                    if state == .connected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(DesignSystem.Colors.alertGreen)
-                    } else if state == .connecting || state == .reconnecting {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    }
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(iconColor.opacity(0.14))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(iconColor)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text(state == .connected ? "Online" : (state == .connecting ? "Connecting..." : subtitle))
+                    Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(state == .connected ? DesignSystem.Colors.alertGreen : .secondary)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(16)
             .background(Color.appCard)
             .cornerRadius(DesignSystem.Radius.medium)
-            .shadow(color: state == .connected ? color.opacity(0.1) : Color.black.opacity(0.03), radius: 8, y: 4)
             .overlay(
                 RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
-                    .stroke(state == .connected ? color.opacity(0.3) : Color.secondary.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
+        .disabled(isLoading)
     }
 }
 
-struct StreamlabsInputSheet: View {
-    @Binding var token: String
-    let isConnecting: Bool
-    let cancel: () -> Void
-    let connect: () -> Void
-    
+struct MVPInfoRow: View {
+    let title: String
+    let value: String
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Streamlabs Connection")
-                        .font(.title3.bold())
-                    Text("Paste your Browser Source URL or socket token below.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                TextField("https://streamlabs.com/alert-box/v3/...", text: $token)
-                    .textFieldStyle(.plain)
-                    .padding()
-                    .background(Color.secondary.opacity(0.05))
-                    .cornerRadius(8)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                
-                Button {
-                    connect()
-                } label: {
-                    HStack {
-                        if isConnecting {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text("Connect")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(token.isEmpty ? Color.gray : DesignSystem.Colors.primaryBlue)
-                    .foregroundStyle(.white)
-                    .font(.headline)
-                    .cornerRadius(DesignSystem.Radius.small)
-                }
-                .disabled(token.isEmpty || isConnecting)
-                
-                Spacer()
-            }
-            .padding(24)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", action: cancel)
-                }
-            }
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
+        .padding(14)
+        .background(Color.appCard)
+        .cornerRadius(DesignSystem.Radius.small)
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.Radius.small)
+                .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 

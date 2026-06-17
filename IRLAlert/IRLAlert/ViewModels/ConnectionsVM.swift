@@ -2,107 +2,76 @@ import Foundation
 import Combine
 
 /// ViewModel for the Connections screen.
-/// Manages service connections and credential input.
+/// Manages Twitch relay setup and proof actions.
 @MainActor
 final class ConnectionsVM: ObservableObject {
     
     // MARK: - Published State
     
-    /// Per-service connection states
-    @Published private(set) var serviceStates: [ServiceIdentifier: ConnectionState] = [:]
-    
-    /// Whether any service is connected
-    @Published private(set) var hasActiveConnection = false
-    
-    /// Number of active services
-    @Published private(set) var activeServiceCount = 0
-    
     /// Last error message for UI display
     @Published private(set) var lastError: String?
     
-    /// User input fields per service
-    @Published var streamlabsInput: String = ""
-    
-    /// Loading state per service
-    @Published var isConnecting: [ServiceIdentifier: Bool] = [:]
-    
-    // MARK: - Dependencies
-    
-    private let connectionManager = ConnectionManager.shared
-    private var cancellables = Set<AnyCancellable>()
-    
-    init() {
-        bindConnectionManager()
-    }
-    
     // MARK: - Public API
-    
-    /// Connect Streamlabs using whatever the user entered (URL or raw token).
-    func connectStreamlabs() async {
-        let input = streamlabsInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !input.isEmpty else { return }
-        
-        isConnecting[.streamlabs] = true
-        lastError = nil
-        
-        let credentials: ServiceCredentials
-        if input.lowercased().hasPrefix("http") {
-            guard let url = URL(string: input) else {
-                lastError = "Invalid URL format."
-                isConnecting[.streamlabs] = false
-                return
-            }
-            credentials = .browserSourceURL(url)
-        } else {
-            credentials = .socketToken(input)
-        }
-        
-        await connectionManager.connect(.streamlabs, with: credentials)
-        isConnecting[.streamlabs] = false
-        
-        if let error = connectionManager.lastError {
-            lastError = error
-        } else {
-            streamlabsInput = "" // Clear on success
-        }
-    }
-    
-    /// Disconnect a specific service.
-    func disconnect(_ serviceId: ServiceIdentifier) {
-        connectionManager.disconnect(serviceId)
-        lastError = nil
-    }
     
     /// Clear the current error message
     func clearError() {
         lastError = nil
-        connectionManager.clearLastError()
     }
-    
-    /// Disconnect all services.
-    func disconnectAll() {
-        connectionManager.disconnectAll()
+
+    /// Request push registration and register this device with the relay for Twitch-native MVP alerts.
+    func registerDeviceForMVP() async {
         lastError = nil
+        await PushNotificationManager.shared.handleUserToggle(enabled: true)
+
+        guard let deviceToken = PushNotificationManager.shared.deviceToken else {
+            lastError = "APNs token is not available yet. Accept notifications and try again."
+            return
+        }
+
+        await RelayClient.shared.registerIfPossible(
+            deviceToken: deviceToken,
+            services: [.twitchNative]
+        )
+
+        if let error = RelayClient.shared.lastRegistrationError {
+            lastError = error
+        }
     }
-    
-    /// Get connection state for a specific service.
-    func state(for serviceId: ServiceIdentifier) -> ConnectionState {
-        serviceStates[serviceId] ?? .disconnected
+
+    /// Ask the relay for a Twitch OAuth URL. The view owns opening the URL.
+    func createTwitchOAuthURL() async -> URL? {
+        lastError = nil
+        let url = await RelayClient.shared.createTwitchOAuthURL()
+        if url == nil {
+            lastError = RelayClient.shared.lastTwitchOAuthError ?? "Could not start Twitch OAuth."
+        }
+        return url
     }
-    
-    // MARK: - Bindings
-    
-    private func bindConnectionManager() {
-        connectionManager.$serviceStates
-            .assign(to: &$serviceStates)
-        
-        connectionManager.$hasActiveConnection
-            .assign(to: &$hasActiveConnection)
-        
-        connectionManager.$activeServiceCount
-            .assign(to: &$activeServiceCount)
-        
-        connectionManager.$lastError
-            .assign(to: &$lastError)
+
+    /// Send a correlated APNs proof alert through the relay.
+    func sendRelayTestAlert() async {
+        lastError = nil
+        await RelayClient.shared.sendRelayTestAlert()
+        if let error = RelayClient.shared.lastTestAlertError {
+            lastError = error
+        }
+    }
+
+    /// Fetch the strict per-user relay readiness gate used by the proof harness.
+    func refreshRelayReadiness() async {
+        lastError = nil
+        await RelayClient.shared.fetchReadiness()
+        if let error = RelayClient.shared.lastReadinessError {
+            lastError = error
+        }
+    }
+
+    /// Fetch safe relay diagnostics for proof-run cross-checking.
+    func refreshRelayDiagnostics() async {
+        lastError = nil
+        await RelayClient.shared.fetchDiagnostics()
+        if let error = RelayClient.shared.lastDiagnosticsError {
+            lastError = error
+        }
     }
 }
