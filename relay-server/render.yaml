@@ -1,0 +1,191 @@
+services:
+  - type: web
+    name: irlalert-relay-api
+    runtime: node
+    plan: starter
+    rootDir: relay-server
+    buildCommand: npm ci
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RELAY_ENVIRONMENT
+        value: production-beta
+      - key: RELAY_STORAGE_DRIVER
+        value: postgres
+      - key: RELAY_QUEUE_DRIVER
+        value: redis
+      - key: RELAY_DELIVERY_MODE
+        value: queue
+      - key: RELAY_REQUIRE_ENCRYPTED_STORAGE
+        value: "true"
+      - key: RELAY_REQUIRE_TOKEN_ENCRYPTION
+        value: "true"
+      - key: RELAY_REQUIRE_QUEUE
+        value: "true"
+      - key: RELAY_REQUIRE_APPLE_AUTH
+        value: "true"
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RELAY_STORAGE_ENCRYPTION_KEY
+        sync: false
+      - key: RELAY_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: RELAY_TOKEN_ENCRYPTION_KEY_ID
+        value: beta-1
+      - key: RELAY_INTERNAL_TOKEN
+        sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: TWITCH_REDIRECT_URI
+        sync: false
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APNS_KEY_ID
+        sync: false
+      - key: APNS_TEAM_ID
+        sync: false
+      - key: APNS_BUNDLE_ID
+        sync: false
+      - key: APNS_PRIVATE_KEY
+        sync: false
+      - key: APNS_PRODUCTION
+        value: "true"
+      - key: SENTRY_DSN
+        sync: false
+      - key: RELAY_WORKER_HEARTBEAT_MAX_AGE_SECONDS
+        value: "120"
+
+  - type: worker
+    name: irlalert-relay-worker
+    runtime: node
+    plan: starter
+    rootDir: relay-server
+    buildCommand: npm ci
+    startCommand: npm run start:worker
+    envVars:
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: NODE_ENV
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_ENVIRONMENT
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_STORAGE_DRIVER
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_QUEUE_DRIVER
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_DELIVERY_MODE
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_REQUIRE_ENCRYPTED_STORAGE
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_REQUIRE_TOKEN_ENCRYPTION
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_REQUIRE_QUEUE
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: DATABASE_SSL
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: DATABASE_URL
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: REDIS_URL
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_STORAGE_ENCRYPTION_KEY
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_TOKEN_ENCRYPTION_KEY
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_TOKEN_ENCRYPTION_KEY_ID
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: TWITCH_CLIENT_ID
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: TWITCH_CLIENT_SECRET
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: TWITCH_REDIRECT_URI
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: APNS_KEY_ID
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: APNS_TEAM_ID
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: APNS_BUNDLE_ID
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: APNS_PRIVATE_KEY
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: APNS_PRODUCTION
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: SENTRY_DSN
+      - key: RELAY_WORKER_ID
+        value: beta-worker-1
+      - key: RELAY_WORKER_HEARTBEAT_INTERVAL_MS
+        value: "30000"
+
+  - type: cron
+    name: irlalert-relay-proof-check
+    runtime: node
+    plan: starter
+    rootDir: relay-server
+    buildCommand: npm ci
+    startCommand: npm run ops:proof
+    schedule: "0 8 * * *"
+    envVars:
+      - key: RELAY_BASE_URL
+        sync: false
+      - key: RELAY_PROOF_USER_ID
+        sync: false
+      - key: RELAY_PROOF_SEND_ALERT
+        value: "false"
+      - key: RELAY_PROOF_SUBSCRIPTION_AUDIT
+        value: "true"
+      - fromService:
+          type: web
+          name: irlalert-relay-api
+          envVarKey: RELAY_INTERNAL_TOKEN

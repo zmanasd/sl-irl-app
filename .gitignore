@@ -2,3 +2,4 @@ relay-server/node_modules/
 relay-server/.data/
 relay-server/.env
 relay-server/.env.*
+auto_pull.log

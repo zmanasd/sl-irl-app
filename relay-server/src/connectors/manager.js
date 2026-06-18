@@ -105,21 +105,24 @@ export class RelayConnectorManager {
         status: "duplicate_provider_message",
         deviceToken: record.deviceToken
       });
+      await this.registry.flush?.();
       return;
     }
 
     try {
       const result = await this.sendAlert({
         deviceToken: record.deviceToken,
-        alert
+        alert,
+        userId
       });
       this.registry.recordDeliveryAttempt({
         userId,
         alert,
-        status: result?.ok ? "sent" : "failed",
+        status: result?.queued ? "queued" : (result?.ok ? "sent" : "failed"),
         result,
         deviceToken: record.deviceToken
       });
+      await this.registry.flush?.();
     } catch (error) {
       this.registry.recordDeliveryAttempt({
         userId,
@@ -128,6 +131,7 @@ export class RelayConnectorManager {
         error,
         deviceToken: record.deviceToken
       });
+      await this.registry.flush?.();
       this.logger.error({ userId, error: error?.message }, "Failed to forward alert.");
     }
   }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 /// Main view for Twitch relay setup, iPhone registration, and delivery diagnostics.
 struct ConnectionsView: View {
@@ -53,6 +54,8 @@ struct ConnectionsView: View {
                         .padding(.horizontal, 24)
                     }
                     
+                    privateBetaAccountSection
+
                     // Twitch MVP proof setup
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -123,6 +126,18 @@ struct ConnectionsView: View {
                             ) {
                                 Task { await viewModel.refreshRelayDiagnostics() }
                             }
+
+                            if appSettings.hasRelaySession {
+                                MVPConnectionActionRow(
+                                    icon: "link.badge.minus",
+                                    iconColor: .red,
+                                    title: "Disconnect Twitch",
+                                    subtitle: accountActionSubtitle,
+                                    isLoading: false
+                                ) {
+                                    Task { await viewModel.disconnectTwitch() }
+                                }
+                            }
                         }
                         .padding(.horizontal, 24)
                     }
@@ -137,7 +152,8 @@ struct ConnectionsView: View {
                         
                         VStack(spacing: 12) {
                             MVPInfoRow(title: "Relay URL", value: appSettings.relayBaseURL)
-                            MVPInfoRow(title: "Relay User", value: shortIdentifier(appSettings.relayUserId))
+                            MVPInfoRow(title: "Relay User", value: shortIdentifier(appSettings.relayEffectiveUserId))
+                            MVPInfoRow(title: "Relay Session", value: appSettings.hasRelaySession ? "Authenticated" : "Local MVP")
                             MVPInfoRow(title: "APNs Token", value: pushManager.deviceToken == nil ? "Missing" : "Available")
                             MVPInfoRow(title: "Last Correlation", value: pushManager.lastAcceptedAlert?.externalIdentity ?? relayClient.lastTestAlertCorrelationId ?? "None")
                             MVPInfoRow(title: "MVP Readiness", value: relayClient.lastUserReadinessSummary)
@@ -156,10 +172,86 @@ struct ConnectionsView: View {
         }
     }
 
+    private var privateBetaAccountSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("PRIVATE BETA ACCOUNT")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .tracking(1.0)
+                .padding(.horizontal, 24)
+
+            VStack(spacing: 12) {
+                if appSettings.hasRelaySession {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(DesignSystem.Colors.alertGreen.opacity(0.14))
+                                    .frame(width: 42, height: 42)
+                                Image(systemName: "person.crop.circle.badge.checkmark")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(DesignSystem.Colors.alertGreen)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Relay Account Connected")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(shortIdentifier(appSettings.relayEffectiveUserId))
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+                        }
+
+                        Button(role: .destructive) {
+                            Task { await viewModel.deleteRelayAccount() }
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete Relay Account")
+                                Spacer()
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.red)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.appCard)
+                    .cornerRadius(DesignSystem.Radius.medium)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignSystem.Radius.medium)
+                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    )
+                } else {
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        Task { await viewModel.completeAppleSignIn(result) }
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 48)
+
+                    Text("Private beta accounts use Apple identity for backend sessions, device registration, and Twitch ownership.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+
     private var relayRegistrationStatus: String {
         if let error = relayClient.lastRegistrationError { return error }
         if let statusCode = relayClient.lastRegistrationStatusCode { return "HTTP \(statusCode)" }
         return "Not registered"
+    }
+
+    private var accountActionSubtitle: String {
+        if let error = relayClient.lastAccountActionError { return error }
+        if let statusCode = relayClient.lastAccountActionStatusCode { return "HTTP \(statusCode)" }
+        return "Remove Twitch OAuth from this relay account"
     }
 
     private var twitchOAuthSubtitle: String {

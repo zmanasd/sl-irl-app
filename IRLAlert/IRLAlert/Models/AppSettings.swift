@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import SwiftUI
 
 /// Centralized app settings backed by UserDefaults.
@@ -22,6 +23,8 @@ final class AppSettings: ObservableObject {
         static let pushNotificationsEnabled = "pushNotificationsEnabled"
         static let relayUserId = "relayUserId"
         static let relayBaseURL = "relayBaseURL"
+        static let relaySessionToken = "relaySessionToken"
+        static let relayAccountUserId = "relayAccountUserId"
     }
 
     private let defaults: UserDefaults
@@ -105,6 +108,36 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(relayBaseURL, forKey: Keys.relayBaseURL) }
     }
 
+    /// Private-beta bearer session returned by `/v1/auth/apple`.
+    @Published private(set) var relaySessionToken: String?
+
+    /// Server-owned user identifier returned by authenticated private-beta APIs.
+    @Published private(set) var relayAccountUserId: String?
+
+    var relayEffectiveUserId: String {
+        relayAccountUserId ?? relayUserId
+    }
+
+    var hasRelaySession: Bool {
+        relaySessionToken?.isEmpty == false
+    }
+
+    func updateRelaySession(userId: String, sessionToken: String) {
+        relayAccountUserId = userId
+        relaySessionToken = sessionToken
+        defaults.set(userId, forKey: Keys.relayAccountUserId)
+        defaults.removeObject(forKey: Keys.relaySessionToken)
+        KeychainTokenStore.save(sessionToken, account: Keys.relaySessionToken)
+    }
+
+    func clearRelaySession() {
+        relayAccountUserId = nil
+        relaySessionToken = nil
+        defaults.removeObject(forKey: Keys.relayAccountUserId)
+        defaults.removeObject(forKey: Keys.relaySessionToken)
+        KeychainTokenStore.delete(account: Keys.relaySessionToken)
+    }
+
     // MARK: - Alert Type Filters
 
     /// Which alert types are enabled for audio playback
@@ -146,10 +179,62 @@ final class AppSettings: ObservableObject {
         relayUserId = defaults.string(forKey: Keys.relayUserId) ?? UUID().uuidString
         defaults.set(relayUserId, forKey: Keys.relayUserId)
         relayBaseURL = defaults.string(forKey: Keys.relayBaseURL) ?? "http://localhost:3000"
+        relayAccountUserId = defaults.string(forKey: Keys.relayAccountUserId)
+        if let legacyToken = defaults.string(forKey: Keys.relaySessionToken), !legacyToken.isEmpty {
+            KeychainTokenStore.save(legacyToken, account: Keys.relaySessionToken)
+            defaults.removeObject(forKey: Keys.relaySessionToken)
+        }
+        relaySessionToken = KeychainTokenStore.load(account: Keys.relaySessionToken)
 
         if let rawValues = defaults.array(forKey: Keys.enabledAlertTypes) as? [String] {
             enabledAlertTypes = Set(rawValues.compactMap { AlertType(rawValue: $0) })
         }
         ttsRate = defaults.float(forKey: Keys.ttsRate)
+    }
+}
+
+private enum KeychainTokenStore {
+    private static let service = "com.irlalert.relay"
+
+    static func save(_ token: String, account: String) {
+        guard let data = token.data(using: .utf8) else { return }
+        delete(account: account)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecValueData as String: data
+        ]
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    static func load(account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let token = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return token
+    }
+
+    static func delete(account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }

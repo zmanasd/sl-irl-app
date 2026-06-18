@@ -41,6 +41,13 @@ final class RelayClient: ObservableObject {
     @Published private(set) var lastDiagnosticsDeliveryStatus: String = "None"
     @Published private(set) var lastDiagnosticsDeviceTokenStatus: String = "Unknown"
     @Published private(set) var lastDiagnosticsHasCurrentUser = false
+    @Published private(set) var lastAuthStatusCode: Int?
+    @Published private(set) var lastAuthError: String?
+    @Published private(set) var lastAccountActionStatusCode: Int?
+    @Published private(set) var lastAccountActionError: String?
+    @Published private(set) var lastAppReceiptStatusCode: Int?
+    @Published private(set) var lastAppReceiptError: String?
+    @Published private(set) var lastAppReceiptCorrelationId: String?
 
     private let logger = Logger(subsystem: "com.irlalert.app", category: "RelayClient")
     private let settings = AppSettings.shared
@@ -71,15 +78,27 @@ final class RelayClient: ObservableObject {
     func registerIfPossible(deviceToken: String, services: [ServiceIdentifier]) async {
         guard settings.pushNotificationsEnabled else { return }
 
-        let payload: [String: Any] = [
-            "userId": settings.relayUserId,
-            "deviceToken": deviceToken,
-            "services": services.map { $0.rawValue },
-            "credentials": []
-        ]
+        let path = settings.hasRelaySession ? "/v1/devices" : "/register"
+        let payload: [String: Any]
+        if settings.hasRelaySession {
+            var betaPayload: [String: Any] = [
+                "deviceToken": deviceToken,
+                "apnsEnvironment": apnsEnvironment
+            ]
+            if let build = appBuild { betaPayload["appBuild"] = build }
+            if let version = appVersion { betaPayload["appVersion"] = version }
+            payload = betaPayload
+        } else {
+            payload = [
+                "userId": settings.relayEffectiveUserId,
+                "deviceToken": deviceToken,
+                "services": services.map { $0.rawValue },
+                "credentials": []
+            ]
+        }
 
         lastRegistrationAttemptAt = Date()
-        let result = await post(path: "/register", body: payload)
+        let result = await post(path: path, body: payload, authenticated: settings.hasRelaySession)
         lastRegistrationStatusCode = result.statusCode
 
         if let error = result.error {
@@ -115,10 +134,23 @@ final class RelayClient: ObservableObject {
             "timestamp": ISO8601DateFormatter().string(from: Date())
         ]
 
-        let result = await post(path: "/alert", body: [
-            "userId": settings.relayUserId,
-            "alert": alert
-        ])
+        let result: (statusCode: Int?, error: String?)
+        if settings.hasRelaySession {
+            let json = await postJson(path: "/v1/test-alert", body: [
+                "type": type.rawValue,
+                "username": "iOSRelayTest",
+                "message": "Relay delivery proof alert"
+            ], authenticated: true)
+            if let backendCorrelationId = json.payload?["correlationId"] as? String {
+                lastTestAlertCorrelationId = backendCorrelationId
+            }
+            result = (json.statusCode, json.error)
+        } else {
+            result = await post(path: "/alert", body: [
+                "userId": settings.relayEffectiveUserId,
+                "alert": alert
+            ])
+        }
 
         lastTestAlertStatusCode = result.statusCode
         if let error = result.error {
@@ -134,13 +166,20 @@ final class RelayClient: ObservableObject {
         isStartingTwitchOAuth = true
         defer { isStartingTwitchOAuth = false }
 
-        guard let url = URL(string: "/auth/twitch/start?userId=\(settings.relayUserId)", relativeTo: baseURL) else {
+        let path = settings.hasRelaySession
+            ? "/v1/twitch/oauth/start"
+            : "/auth/twitch/start?userId=\(settings.relayEffectiveUserId)"
+        guard let url = URL(string: path, relativeTo: baseURL) else {
             lastTwitchOAuthError = "Invalid relay URL"
             return nil
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            if settings.hasRelaySession, let token = settings.relaySessionToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
             lastTwitchOAuthStatusCode = (response as? HTTPURLResponse)?.statusCode
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -169,13 +208,17 @@ final class RelayClient: ObservableObject {
         isFetchingReadiness = true
         defer { isFetchingReadiness = false }
 
-        guard var components = URLComponents(url: baseURL.appendingPathComponent("ready"), resolvingAgainstBaseURL: false) else {
+        let readinessPath = settings.hasRelaySession ? "/v1/status" : "/ready"
+        guard let readinessURL = URL(string: readinessPath, relativeTo: baseURL),
+              var components = URLComponents(url: readinessURL, resolvingAgainstBaseURL: true) else {
             lastReadinessError = "Invalid relay URL"
             return
         }
-        components.queryItems = [
-            URLQueryItem(name: "userId", value: settings.relayUserId)
-        ]
+        if !settings.hasRelaySession {
+            components.queryItems = [
+                URLQueryItem(name: "userId", value: settings.relayEffectiveUserId)
+            ]
+        }
 
         guard let url = components.url else {
             lastReadinessError = "Invalid relay URL"
@@ -183,7 +226,11 @@ final class RelayClient: ObservableObject {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            if settings.hasRelaySession, let token = settings.relaySessionToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
             lastReadinessStatusCode = (response as? HTTPURLResponse)?.statusCode
 
             guard let payload = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
@@ -192,7 +239,13 @@ final class RelayClient: ObservableObject {
                 return
             }
 
-            applyReadiness(payload)
+            if settings.hasRelaySession,
+               var readinessPayload = payload["readiness"] as? [String: Any] {
+                readinessPayload["user"] = payload["user"]
+                applyReadiness(readinessPayload)
+            } else {
+                applyReadiness(payload)
+            }
             lastReadinessFetchedAt = Date()
             lastReadinessError = nil
         } catch {
@@ -206,13 +259,18 @@ final class RelayClient: ObservableObject {
         isFetchingDiagnostics = true
         defer { isFetchingDiagnostics = false }
 
-        guard let url = URL(string: "/diagnostics", relativeTo: baseURL) else {
+        let path = settings.hasRelaySession ? "/v1/diagnostics" : "/diagnostics"
+        guard let url = URL(string: path, relativeTo: baseURL) else {
             lastDiagnosticsError = "Invalid relay URL"
             return
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            if settings.hasRelaySession, let token = settings.relaySessionToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
             lastDiagnosticsStatusCode = (response as? HTTPURLResponse)?.statusCode
 
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -234,34 +292,178 @@ final class RelayClient: ObservableObject {
         }
     }
 
+    func storeAppleIdentityToken(_ identityToken: String, fullName: String? = nil) async {
+        var body: [String: Any] = ["identityToken": identityToken]
+        if let fullName {
+            body["fullName"] = fullName
+        }
+
+        let result = await postJson(path: "/v1/auth/apple", body: body)
+        lastAuthStatusCode = result.statusCode
+
+        guard result.error == nil else {
+            lastAuthError = result.error
+            return
+        }
+        guard let payload = result.payload,
+              let userId = payload["userId"] as? String,
+              let sessionToken = payload["sessionToken"] as? String else {
+            lastAuthError = "Missing relay session"
+            return
+        }
+
+        settings.updateRelaySession(userId: userId, sessionToken: sessionToken)
+        lastAuthError = nil
+    }
+
+    func disconnectTwitch() async {
+        guard settings.hasRelaySession else {
+            lastAccountActionError = "Relay session required"
+            return
+        }
+
+        let result = await post(path: "/v1/twitch/disconnect", body: [:], authenticated: true)
+        lastAccountActionStatusCode = result.statusCode
+        if let error = result.error {
+            lastAccountActionError = error
+        } else if let statusCode = result.statusCode, statusCode >= 400 {
+            lastAccountActionError = "HTTP \(statusCode)"
+        } else {
+            lastAccountActionError = nil
+            await fetchDiagnostics()
+            await fetchReadiness()
+        }
+    }
+
+    func deleteRelayAccount() async {
+        guard settings.hasRelaySession else {
+            lastAccountActionError = "Relay session required"
+            return
+        }
+
+        let result = await delete(path: "/v1/account", authenticated: true)
+        lastAccountActionStatusCode = result.statusCode
+        if let error = result.error {
+            lastAccountActionError = error
+        } else if let statusCode = result.statusCode, statusCode >= 400 {
+            lastAccountActionError = "HTTP \(statusCode)"
+        } else {
+            settings.clearRelaySession()
+            lastAccountActionError = nil
+            lastUserReadinessOk = false
+            lastUserReadinessSummary = "Account deleted"
+            lastDiagnosticsSummary = "Session cleared"
+        }
+    }
+
+    func recordAppReceipt(for event: AlertEvent) async {
+        guard settings.hasRelaySession else { return }
+        guard let correlationId = event.correlationId ?? event.providerMessageId else { return }
+        lastAppReceiptCorrelationId = correlationId
+
+        var body: [String: Any] = [
+            "correlationId": correlationId,
+            "status": "received",
+            "appReceivedAt": ISO8601DateFormatter().string(from: Date())
+        ]
+        if let providerMessageId = event.providerMessageId {
+            body["providerMessageId"] = providerMessageId
+        }
+        if let build = appBuild {
+            body["appBuild"] = build
+        }
+        if let version = appVersion {
+            body["appVersion"] = version
+        }
+
+        let result = await post(path: "/v1/alerts/receipt", body: body, authenticated: true)
+        lastAppReceiptStatusCode = result.statusCode
+        if let error = result.error {
+            lastAppReceiptError = error
+        } else if let statusCode = result.statusCode, statusCode >= 400 {
+            lastAppReceiptError = "HTTP \(statusCode)"
+        } else {
+            lastAppReceiptError = nil
+        }
+    }
+
     // MARK: - Networking
 
     @discardableResult
-    private func post(path: String, body: [String: Any]) async -> (statusCode: Int?, error: String?) {
+    private func post(path: String, body: [String: Any], authenticated: Bool = false) async -> (statusCode: Int?, error: String?) {
+        let result = await postJson(path: path, body: body, authenticated: authenticated)
+        return (result.statusCode, result.error)
+    }
+
+    @discardableResult
+    private func postJson(path: String, body: [String: Any], authenticated: Bool = false) async -> (statusCode: Int?, payload: [String: Any]?, error: String?) {
         guard let url = URL(string: path, relativeTo: baseURL) else {
-            return (nil, "Invalid relay URL")
+            return (nil, nil, "Invalid relay URL")
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if authenticated, let token = settings.relaySessionToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                logger.warning("Relay server returned status \(http.statusCode)")
+            }
+            let payload = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+            return ((response as? HTTPURLResponse)?.statusCode, payload, nil)
+        } catch {
+            logger.error("Relay request failed: \(error.localizedDescription)")
+            return (nil, nil, error.localizedDescription)
+        }
+    }
+
+    private var apnsEnvironment: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "production"
+        #endif
+    }
+
+    private var appBuild: String? {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+    }
+
+    private var appVersion: String? {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+
+    @discardableResult
+    private func delete(path: String, authenticated: Bool = false) async -> (statusCode: Int?, error: String?) {
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            return (nil, "Invalid relay URL")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if authenticated, let token = settings.relaySessionToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
             let (_, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
                 logger.warning("Relay server returned status \(http.statusCode)")
             }
             return ((response as? HTTPURLResponse)?.statusCode, nil)
         } catch {
-            logger.error("Relay request failed: \(error.localizedDescription)")
+            logger.error("Relay delete request failed: \(error.localizedDescription)")
             return (nil, error.localizedDescription)
         }
     }
 
     private func applyDiagnostics(_ payload: [String: Any]) {
         let users = payload["users"] as? [[String: Any]] ?? []
-        let currentUser = users.first { user in
-            stringValue(user["userId"]) == settings.relayUserId
+        let currentUser = payload["user"] as? [String: Any] ?? users.first { user in
+            stringValue(user["userId"]) == settings.relayEffectiveUserId
         }
 
         lastDiagnosticsHasCurrentUser = currentUser != nil
@@ -282,7 +484,8 @@ final class RelayClient: ObservableObject {
             lastDiagnosticsConnectorRecoveryStatus = "Unknown"
         }
 
-        let readiness = payload["readiness"] as? [String: Any]
+        let readinessContainer = payload["readiness"] as? [String: Any]
+        let readiness = readinessContainer?["readiness"] as? [String: Any] ?? readinessContainer
         lastDiagnosticsApnsReadiness = readinessSummary(
             readiness?["apns"] as? [String: Any],
             readyLabel: "Configured"
@@ -292,7 +495,9 @@ final class RelayClient: ObservableObject {
             readyLabel: "Configured"
         )
 
-        let attempts = payload["recentDeliveryAttempts"] as? [[String: Any]] ?? []
+        let attempts = payload["attempts"] as? [[String: Any]]
+            ?? payload["recentDeliveryAttempts"] as? [[String: Any]]
+            ?? []
         if let lastAttempt = attempts.last {
             let status = stringValue(lastAttempt["status"]) ?? "unknown"
             let correlationId = stringValue(lastAttempt["correlationId"]) ?? stringValue(lastAttempt["providerMessageId"])
@@ -303,7 +508,9 @@ final class RelayClient: ObservableObject {
             lastDiagnosticsDeliveryStatus = "None"
         }
 
-        let tokenRefreshAttempts = payload["recentTokenRefreshAttempts"] as? [[String: Any]] ?? []
+        let tokenRefreshAttempts = payload["tokenRefreshAttempts"] as? [[String: Any]]
+            ?? payload["recentTokenRefreshAttempts"] as? [[String: Any]]
+            ?? []
         if let lastRefreshAttempt = tokenRefreshAttempts.last {
             let status = stringValue(lastRefreshAttempt["status"]) ?? "unknown"
             let userId = stringValue(lastRefreshAttempt["userId"]).map(shortIdentifier)
@@ -323,7 +530,8 @@ final class RelayClient: ObservableObject {
         }
 
         let currentUserStatus = currentUser == nil ? "missing user" : "user registered"
-        lastDiagnosticsSummary = "\(users.count) users, \(currentUserStatus)"
+        let userCount = payload["user"] == nil ? users.count : 1
+        lastDiagnosticsSummary = "\(userCount) users, \(currentUserStatus)"
     }
 
     private func applyReadiness(_ payload: [String: Any]) {

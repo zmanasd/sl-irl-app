@@ -101,7 +101,10 @@ final class PushNotificationManager: NSObject, ObservableObject {
         lastAcceptedAlert = event
         lastDroppedAlertReason = nil
         AlertQueueManager.shared.enqueue(event)
-        Task { await EventStore.shared.add(event) }
+        Task {
+            await EventStore.shared.add(event)
+            await RelayClient.shared.recordAppReceipt(for: event)
+        }
         return event
     }
 

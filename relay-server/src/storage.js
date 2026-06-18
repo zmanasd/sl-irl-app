@@ -4,6 +4,7 @@ import path from "path";
 
 const ENCRYPTION_VERSION = 1;
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+const DEFAULT_POSTGRES_STORE_KEY = "relay";
 
 function decodeEncryptionKey(key) {
   if (!key) return null;
@@ -72,7 +73,9 @@ export class LocalJsonStore {
       twitchOAuthStates: [],
       deliveryAttempts: [],
       tokenRefreshAttempts: [],
-      providerMessages: []
+      providerMessages: [],
+      appReceipts: [],
+      operations: {}
     };
     this.load();
   }
@@ -100,7 +103,13 @@ export class LocalJsonStore {
         : [],
       providerMessages: Array.isArray(parsed.providerMessages)
         ? parsed.providerMessages
-        : []
+        : [],
+      appReceipts: Array.isArray(parsed.appReceipts)
+        ? parsed.appReceipts
+        : [],
+      operations: parsed.operations && typeof parsed.operations === "object"
+        ? parsed.operations
+        : {}
     };
   }
 
@@ -122,7 +131,13 @@ export class LocalJsonStore {
         : [],
       providerMessages: Array.isArray(nextData?.providerMessages)
         ? nextData.providerMessages
-        : []
+        : [],
+      appReceipts: Array.isArray(nextData?.appReceipts)
+        ? nextData.appReceipts
+        : [],
+      operations: nextData?.operations && typeof nextData.operations === "object"
+        ? nextData.operations
+        : {}
     };
     this.save();
   }
@@ -147,4 +162,151 @@ export class LocalJsonStore {
       encrypted: this.encrypted
     };
   }
+}
+
+export class PostgresSnapshotStore {
+  constructor({
+    pool,
+    key = DEFAULT_POSTGRES_STORE_KEY,
+    encryptionKey = process.env.RELAY_STORAGE_ENCRYPTION_KEY,
+    data = null
+  }) {
+    this.pool = pool;
+    this.key = key;
+    this.encryptionKey = encryptionKey;
+    this.encrypted = Boolean(encryptionKey);
+    this.pendingWrite = null;
+    this.data = normalizeSnapshot(data);
+  }
+
+  static async create({
+    connectionString = process.env.DATABASE_URL,
+    key = DEFAULT_POSTGRES_STORE_KEY,
+    encryptionKey = process.env.RELAY_STORAGE_ENCRYPTION_KEY,
+    ssl = process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
+  } = {}) {
+    if (!connectionString) {
+      throw new Error("DATABASE_URL is required for Postgres storage.");
+    }
+
+    const { Pool } = await import("pg");
+    const pool = new Pool({ connectionString, ssl });
+    await ensurePostgresSchema(pool);
+
+    const result = await pool.query(
+      "select payload from relay_snapshots where key = $1",
+      [key]
+    );
+    const payload = result.rows[0]?.payload ?? null;
+    const data = payload
+      ? readEncryptedSnapshot({ payload, key: encryptionKey })
+      : null;
+
+    return new PostgresSnapshotStore({
+      pool,
+      key,
+      encryptionKey,
+      data
+    });
+  }
+
+  snapshot() {
+    return structuredClone(this.data);
+  }
+
+  replace(nextData) {
+    this.data = normalizeSnapshot(nextData);
+    const payload = createEncryptedSnapshot({
+      data: this.data,
+      key: this.encryptionKey
+    });
+
+    this.pendingWrite = this.pool.query(
+      `insert into relay_snapshots (key, payload, updated_at)
+       values ($1, $2::jsonb, now())
+       on conflict (key)
+       do update set payload = excluded.payload, updated_at = excluded.updated_at`,
+      [this.key, JSON.stringify(payload)]
+    );
+
+    return this.pendingWrite;
+  }
+
+  async flush() {
+    if (this.pendingWrite) {
+      await this.pendingWrite;
+      this.pendingWrite = null;
+    }
+  }
+
+  async close() {
+    await this.flush();
+    await this.pool.end();
+  }
+
+  diagnostics() {
+    return {
+      type: "postgres_snapshot",
+      encrypted: this.encrypted,
+      key: this.key
+    };
+  }
+}
+
+export async function createStoreFromEnv(env = process.env) {
+  const driver = env.RELAY_STORAGE_DRIVER ?? (env.DATABASE_URL ? "postgres" : "local_json");
+
+  if (driver === "postgres") {
+    return PostgresSnapshotStore.create({
+      connectionString: env.DATABASE_URL,
+      key: env.RELAY_POSTGRES_SNAPSHOT_KEY ?? DEFAULT_POSTGRES_STORE_KEY,
+      encryptionKey: env.RELAY_STORAGE_ENCRYPTION_KEY,
+      ssl: env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
+    });
+  }
+
+  if (driver !== "local_json") {
+    throw new Error(`Unsupported RELAY_STORAGE_DRIVER: ${driver}`);
+  }
+
+  const dataPath = env.RELAY_DATA_PATH
+    ?? path.resolve("relay-server/.data/relay-store.json");
+  return new LocalJsonStore(dataPath, {
+    encryptionKey: env.RELAY_STORAGE_ENCRYPTION_KEY
+  });
+}
+
+async function ensurePostgresSchema(pool) {
+  await pool.query(`
+    create table if not exists relay_snapshots (
+      key text primary key,
+      payload jsonb not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+}
+
+function normalizeSnapshot(snapshot) {
+  return {
+    records: Array.isArray(snapshot?.records) ? snapshot.records : [],
+    twitchOAuthStates: Array.isArray(snapshot?.twitchOAuthStates)
+      ? snapshot.twitchOAuthStates
+      : [],
+    deliveryAttempts: Array.isArray(snapshot?.deliveryAttempts)
+      ? snapshot.deliveryAttempts
+      : [],
+    tokenRefreshAttempts: Array.isArray(snapshot?.tokenRefreshAttempts)
+      ? snapshot.tokenRefreshAttempts
+      : [],
+    providerMessages: Array.isArray(snapshot?.providerMessages)
+      ? snapshot.providerMessages
+      : [],
+    appReceipts: Array.isArray(snapshot?.appReceipts)
+      ? snapshot.appReceipts
+      : [],
+    operations: snapshot?.operations && typeof snapshot.operations === "object"
+      ? snapshot.operations
+      : {}
+  };
 }

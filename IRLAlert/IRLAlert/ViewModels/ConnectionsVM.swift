@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AuthenticationServices
 
 /// ViewModel for the Connections screen.
 /// Manages Twitch relay setup and proof actions.
@@ -46,6 +47,49 @@ final class ConnectionsVM: ObservableObject {
             lastError = RelayClient.shared.lastTwitchOAuthError ?? "Could not start Twitch OAuth."
         }
         return url
+    }
+
+    /// Complete Sign in with Apple and store the relay beta session.
+    func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
+        lastError = nil
+
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let identityToken = credential.identityToken,
+                  let identityTokenString = String(data: identityToken, encoding: .utf8) else {
+                lastError = "Apple identity token was not available."
+                return
+            }
+
+            let fullName = credential.fullName
+                .map(PersonNameComponentsFormatter().string(from:))
+            await RelayClient.shared.storeAppleIdentityToken(identityTokenString, fullName: fullName)
+            if let error = RelayClient.shared.lastAuthError {
+                lastError = error
+            }
+
+        case .failure(let error):
+            lastError = error.localizedDescription
+        }
+    }
+
+    /// Disconnect Twitch from the authenticated relay account.
+    func disconnectTwitch() async {
+        lastError = nil
+        await RelayClient.shared.disconnectTwitch()
+        if let error = RelayClient.shared.lastAccountActionError {
+            lastError = error
+        }
+    }
+
+    /// Delete the authenticated relay account and clear the local session.
+    func deleteRelayAccount() async {
+        lastError = nil
+        await RelayClient.shared.deleteRelayAccount()
+        if let error = RelayClient.shared.lastAccountActionError {
+            lastError = error
+        }
     }
 
     /// Send a correlated APNs proof alert through the relay.

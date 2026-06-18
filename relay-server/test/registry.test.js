@@ -89,6 +89,83 @@ test("encrypted snapshots require the correct storage key", () => {
   );
 });
 
+test("field-level secret encryption protects OAuth, Apple, and device tokens at rest", () => {
+  const storePath = tempStorePath();
+  const secretEncryptionKey = Buffer.alloc(32, 9).toString("base64");
+  const registry = new RelayRegistry({
+    storage: new LocalJsonStore(storePath),
+    secretEncryptionKey,
+    secretEncryptionKeyId: "test-key"
+  });
+
+  const account = registry.upsertAppleAccount({
+    appleSubject: "secret-apple-subject",
+    email: "streamer@example.com",
+    fullName: "Streamer"
+  });
+  registry.register({
+    userId: account.userId,
+    deviceToken: "secret-device-token",
+    services: ["twitch_native"],
+    credentials: []
+  });
+  registry.setTwitchAuth({
+    userId: account.userId,
+    twitchUser: {
+      id: "1234",
+      login: "streamer",
+      display_name: "Streamer"
+    },
+    tokenPayload: {
+      access_token: "secret-access-token",
+      refresh_token: "secret-refresh-token",
+      expires_in: 3600,
+      scope: ["bits:read"]
+    },
+    scopes: []
+  });
+
+  const raw = fs.readFileSync(storePath, "utf8");
+  assert.equal(raw.includes("secret-device-token"), false);
+  assert.equal(raw.includes("secret-access-token"), false);
+  assert.equal(raw.includes("secret-refresh-token"), false);
+  assert.equal(raw.includes("secret-apple-subject"), false);
+  assert.equal(raw.includes("streamer@example.com"), false);
+  assert.equal(raw.includes("relay_secret"), true);
+  assert.equal(raw.includes("test-key"), true);
+
+  const reloaded = new RelayRegistry({
+    storage: new LocalJsonStore(storePath),
+    secretEncryptionKey
+  });
+  assert.equal(reloaded.get(account.userId).deviceToken, "secret-device-token");
+  assert.equal(reloaded.get(account.userId).twitch.accessToken, "secret-access-token");
+  assert.equal(reloaded.get(account.userId).twitch.refreshToken, "secret-refresh-token");
+  assert.equal(reloaded.get(account.userId).account.providerSubject, "secret-apple-subject");
+  assert.equal(reloaded.get(account.userId).account.email, "streamer@example.com");
+});
+
+test("encrypted relay secrets require the token encryption key on reload", () => {
+  const storePath = tempStorePath();
+  const secretEncryptionKey = Buffer.alloc(32, 10).toString("base64");
+  const registry = new RelayRegistry({
+    storage: new LocalJsonStore(storePath),
+    secretEncryptionKey
+  });
+
+  registry.register({
+    userId: "user-1",
+    deviceToken: "secret-device-token",
+    services: ["twitch_native"],
+    credentials: []
+  });
+
+  assert.throws(
+    () => new RelayRegistry({ storage: new LocalJsonStore(storePath), secretEncryptionKey: null }),
+    /RELAY_TOKEN_ENCRYPTION_KEY is required/
+  );
+});
+
 test("stores and consumes Twitch OAuth states once", () => {
   const registry = new RelayRegistry();
   registry.saveTwitchOAuthState({
@@ -99,6 +176,83 @@ test("stores and consumes Twitch OAuth states once", () => {
 
   assert.equal(registry.consumeTwitchOAuthState("state-1").userId, "user-1");
   assert.equal(registry.consumeTwitchOAuthState("state-1"), null);
+});
+
+test("creates Apple accounts and bearer sessions without exposing session tokens", () => {
+  const registry = new RelayRegistry();
+  const record = registry.upsertAppleAccount({
+    appleSubject: "apple-user-1",
+    email: "streamer@example.com",
+    fullName: "Streamer"
+  });
+  const { token, session } = registry.createSession({ userId: record.userId });
+
+  assert.equal(record.account.provider, "apple");
+  assert.equal(typeof token, "string");
+  assert.equal(registry.getSession(token).userId, record.userId);
+  assert.equal(registry.getSession("wrong-token"), null);
+  assert.equal(session.id.startsWith("session_"), true);
+  assert.equal(JSON.stringify(registry.diagnostics()).includes(token), false);
+  assert.equal(JSON.stringify(registry.diagnostics()).includes("apple-user-1"), false);
+});
+
+test("stores multiple devices with safe diagnostics", () => {
+  const registry = new RelayRegistry();
+  const record = registry.upsertAppleAccount({ appleSubject: "apple-user-1" });
+
+  const first = registry.upsertDevice({
+    userId: record.userId,
+    deviceToken: "device-token-one",
+    apnsEnvironment: "sandbox",
+    appBuild: "100"
+  });
+  registry.upsertDevice({
+    userId: record.userId,
+    deviceToken: "device-token-two",
+    apnsEnvironment: "production",
+    appBuild: "101"
+  });
+
+  assert.equal(registry.get(record.userId).deviceToken, "device-token-two");
+  assert.equal(registry.diagnostics().users[0].devices.length, 2);
+  assert.equal(registry.diagnostics().users[0].devices[0].hasDeviceToken, true);
+  assert.equal(JSON.stringify(registry.diagnostics()).includes("device-token-one"), false);
+
+  assert.equal(registry.removeDevice({ userId: record.userId, deviceId: first.id }), true);
+  assert.equal(registry.diagnostics().users[0].devices.length, 1);
+});
+
+test("disconnects Twitch and deletes account-owned state", () => {
+  const registry = new RelayRegistry();
+  const record = registry.upsertAppleAccount({ appleSubject: "apple-user-1" });
+  registry.setTwitchAuth({
+    userId: record.userId,
+    twitchUser: {
+      id: "1234",
+      login: "streamer",
+      display_name: "Streamer"
+    },
+    tokenPayload: {
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+      expires_in: 3600,
+      scope: ["bits:read"]
+    },
+    scopes: []
+  });
+  registry.recordDeliveryAttempt({
+    userId: record.userId,
+    alert: { correlationId: "proof:1" },
+    status: "sent"
+  });
+
+  registry.disconnectTwitch(record.userId);
+  assert.equal(registry.get(record.userId).twitch, undefined);
+  assert.deepEqual(registry.get(record.userId).services, []);
+
+  assert.equal(registry.deleteAccount(record.userId), true);
+  assert.equal(registry.get(record.userId), undefined);
+  assert.equal(registry.diagnostics().recentDeliveryAttempts.length, 0);
 });
 
 test("stores Twitch auth server-side and exposes connector credential", () => {
@@ -258,6 +412,106 @@ test("persists provider message dedupe reservations", () => {
   assert.equal(duplicate.duplicate, true);
   assert.equal(duplicate.firstSeenAt, "2026-06-16T10:00:00.000Z");
   assert.equal(reloaded.diagnostics().providerMessageDedupe.tracked, 1);
+});
+
+test("builds a delivery trace across provider receipt, APNs attempt, and app receipt", () => {
+  const registry = new RelayRegistry();
+  const alert = {
+    correlationId: "twitch:message-1",
+    providerMessageId: "message-1",
+    source: "twitch_native",
+    type: "follow"
+  };
+
+  registry.reserveProviderMessage({
+    userId: "user-1",
+    alert,
+    now: new Date("2026-06-18T10:00:00.000Z")
+  });
+  registry.recordDeliveryAttempt({
+    userId: "user-1",
+    alert,
+    status: "queued",
+    jobId: "job-1",
+    queueAttempt: 0,
+    deviceToken: "device-token"
+  });
+  registry.recordDeliveryAttempt({
+    userId: "user-1",
+    alert,
+    status: "sent",
+    result: {
+      apnsIds: ["apns-1"],
+      summary: { sent: 1, failed: 0 }
+    },
+    jobId: "job-1",
+    queueAttempt: 0,
+    deviceToken: "device-token"
+  });
+  registry.recordAppReceipt({
+    userId: "user-1",
+    correlationId: "twitch:message-1",
+    providerMessageId: "message-1",
+    appBuild: "100"
+  });
+
+  const trace = registry.deliveryTrace({ correlationId: "twitch:message-1", userId: "user-1" });
+  assert.equal(trace.providerMessages.length, 1);
+  assert.equal(trace.deliveryAttempts.length, 2);
+  assert.equal(trace.appReceipts.length, 1);
+  assert.equal(trace.stages.providerReceived, true);
+  assert.equal(trace.stages.queued, true);
+  assert.equal(trace.stages.apnsAttempted, true);
+  assert.equal(trace.stages.apnsSent, true);
+  assert.equal(trace.stages.appReceived, true);
+});
+
+test("tracks duplicate provider message counts without forwarding duplicates", () => {
+  const registry = new RelayRegistry();
+  const alert = {
+    correlationId: "twitch:message-1",
+    providerMessageId: "message-1",
+    source: "twitch_native",
+    type: "follow"
+  };
+
+  const first = registry.reserveProviderMessage({ userId: "user-1", alert });
+  const duplicate = registry.reserveProviderMessage({ userId: "user-1", alert });
+
+  assert.equal(first.duplicate, false);
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(duplicate.duplicateCount, 1);
+  assert.equal(registry.diagnostics().providerMessageDedupe.recent[0].duplicateCount, 1);
+});
+
+test("persists operational worker heartbeat and proof check summaries", () => {
+  const storePath = tempStorePath();
+  const registry = new RelayRegistry({ storage: new LocalJsonStore(storePath) });
+
+  registry.recordWorkerHeartbeat({
+    workerId: "worker-1",
+    processed: true,
+    now: new Date("2026-06-18T10:00:00.000Z")
+  });
+  registry.recordProofCheck({
+    status: "passed",
+    checks: [
+      { name: "database_storage", ok: true, category: "database" },
+      { name: "delivery_queue", ok: true, category: "queue" }
+    ],
+    userId: "user-1",
+    correlationId: "proof:one",
+    now: new Date("2026-06-18T10:01:00.000Z")
+  });
+
+  const reloaded = new RelayRegistry({ storage: new LocalJsonStore(storePath) });
+  const diagnostics = reloaded.diagnostics();
+
+  assert.equal(diagnostics.operations.workerHeartbeats["worker-1"].status, "alive");
+  assert.equal(diagnostics.operations.workerHeartbeats["worker-1"].processed, true);
+  assert.equal(diagnostics.operations.proofChecks[0].status, "passed");
+  assert.equal(diagnostics.operations.proofChecks[0].checks[0].category, "database");
+  assert.equal(diagnostics.operations.proofChecks[0].correlationId, "proof:one");
 });
 
 test("diagnostics omit raw secrets", () => {

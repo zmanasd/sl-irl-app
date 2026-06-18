@@ -1,9 +1,21 @@
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
-import { createLogger, createRelayApp } from "./app.js";
+import { createDefaultRegistryAsync, createLogger, createRelayApp } from "./app.js";
+import { createDeliveryQueueFromEnv } from "./queue.js";
+import { initSentry } from "./observability.js";
 
 const logger = createLogger();
-const { app, refreshDueTwitchTokens, syncAllUsers } = createRelayApp({ logger });
+await initSentry({ env: process.env, logger });
+const role = process.env.RELAY_PROCESS_ROLE ?? "all";
+const registry = await createDefaultRegistryAsync(process.env);
+const deliveryQueue = process.env.RELAY_DELIVERY_MODE === "queue"
+  ? await createDeliveryQueueFromEnv(process.env)
+  : null;
+const { app, refreshDueTwitchTokens, syncAllUsers } = createRelayApp({
+  registry,
+  logger,
+  deliveryQueue
+});
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
@@ -19,6 +31,11 @@ server.listen(port, () => {
 });
 
 async function runStartupRecovery() {
+  if (role === "api") {
+    logger.info("Skipping connector startup recovery in API-only role.");
+    return;
+  }
+
   try {
     const refreshResults = await refreshDueTwitchTokens();
     const refreshed = refreshResults.filter((result) => result.ok).length;
@@ -39,7 +56,7 @@ async function runStartupRecovery() {
 runStartupRecovery();
 
 const refreshIntervalSeconds = Number(process.env.TWITCH_TOKEN_REFRESH_INTERVAL_SECONDS ?? 300);
-if (refreshIntervalSeconds > 0) {
+if (role !== "api" && refreshIntervalSeconds > 0) {
   setInterval(async () => {
     try {
       const results = await refreshDueTwitchTokens();
