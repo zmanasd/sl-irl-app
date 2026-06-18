@@ -1,2 +1,4 @@
 relay-server/node_modules/
 relay-server/.data/
+relay-server/.env
+relay-server/.env.*
